@@ -6,6 +6,7 @@ package dnsworker
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -31,6 +32,12 @@ var _ = BeforeSuite(NodeTimeout(120*time.Second), func(ctx context.Context) {
 		messymoby.Cleanup(ctx)
 	})
 })
+
+func init() {
+	// avoid M0 ending up wedged as it was used during a throw-away namespace
+	// switch, but as M0 is special it cannot be killed.
+	runtime.LockOSThread()
+}
 
 func TestDnsworker(t *testing.T) {
 	RegisterFailHandler(Fail)
