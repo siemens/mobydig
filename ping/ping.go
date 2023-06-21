@@ -137,9 +137,9 @@ func (p *Pinger) ValidateStream(ch <-chan types.QualifiedAddress) {
 // context cancelled, so callers typically might run ValidateStream in a
 // separate goroutine.
 //
-// If the specified context gets cancelled the pending address verfications
+// If the specified context gets cancelled the pending address verifications
 // won't be echoed to the verdict stream at all, and in particular not even as
-// invalid. However, spurious verfication verdicts might still appear on the
+// invalid. However, spurious verification verdicts might still appear on the
 // verdict stream due to uncontrollable order of verdict sending and context
 // cancellation detection.
 //
@@ -164,9 +164,9 @@ func (p *Pinger) ValidateStreamContext(ctx context.Context, ch <-chan types.Qual
 // the channel returned together with the newly created [Pinger]. Additionally,
 // an initial notice for the address to be validated is also sent beforehand.
 //
-// If the specified context gets cancelled the pending address verfications
+// If the specified context gets cancelled the pending address verifications
 // won't be echoed to the verdict stream at all, and in particular not even as
-// invalid. However, spurious verfication verdicts might still appear on the
+// invalid. However, spurious verification verdicts might still appear on the
 // verdict stream due to uncontrollable order of verdict sending and context
 // cancellation detection.
 //
@@ -193,9 +193,9 @@ func (p *Pinger) Validate(ctx context.Context, addr string) {
 // ValidateQA validates the specified [types.QualifiedAddress] and works
 // otherwise like [Validate] for a plain address string.
 //
-// If the specified context gets cancelled the pending address verfications
+// If the specified context gets cancelled the pending address verifications
 // won't be echoed to the verdict stream at all, and in particular not even as
-// invalid. However, spurious verfication verdicts might still appear on the
+// invalid. However, spurious verification verdicts might still appear on the
 // verdict stream due to uncontrollable order of verdict sending and context
 // cancellation detection.
 //
@@ -215,9 +215,9 @@ func (p *Pinger) ValidateQA(ctx context.Context, addr types.QualifiedAddress) {
 // either meets its deadline or gets cancelled. The IP address is then
 // considered to be Invalid.
 //
-// If the specified context gets cancelled the pending address verfications
+// If the specified context gets cancelled the pending address verifications
 // won't be echoed to the verdict stream at all, and in particular not even as
-// invalid. However, spurious verfication verdicts might still appear on the
+// invalid. However, spurious verification verdicts might still appear on the
 // verdict stream due to uncontrollable order of verdict sending and context
 // cancellation detection.
 func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
