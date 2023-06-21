@@ -1,0 +1,44 @@
+version: '2.4'
+x-env:
+    labels: &messy-labels
+        messymoby: ""
+    service: &sleepy
+        image: busybox:latest
+        command:
+            - "/bin/sh"
+            - "-c"
+            - "while true; do sleep 1; done"
+        stop_signal: SIGKILL
+        labels: *messy-labels
+
+services:
+    foo:
+        <<: *sleepy
+        networks:
+            - netA
+            - netC
+
+    bar:
+        <<: *sleepy
+        stop_signal: SIGKILL
+        networks:
+            - netB
+
+    test:
+        <<: *sleepy
+        stop_signal: SIGKILL
+        networks:
+            - netA
+            - netB
+            - netC
+
+networks:
+    netA:
+        name: net_A
+        labels: *messy-labels
+    netB:
+        name: net_B
+        labels: *messy-labels
+    netC:
+        name: net_C
+        labels: *messy-labels

@@ -1,0 +1,6 @@
+.vscode/*.log
+dist/
+/main
+/mobydig
+__debug_bin
+coverage.*

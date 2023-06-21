@@ -1,0 +1,9 @@
+.git/
+.github/
+.vscode/
+
+dist/
+/main
+/mobydig
+__debug_bin
+coverage.*
