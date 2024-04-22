@@ -9,7 +9,7 @@
 ![build and test](https://github.com/siemens/mobydig/workflows/build%20and%20test/badge.svg?branch=main)
 ![file descriptors](https://img.shields.io/badge/go%20routines-not%20leaking-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/siemens/mobydig)](https://goreportcard.com/report/github.com/siemens/mobydig)
-![Coverage](https://img.shields.io/badge/Coverage-82.2%25-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-84.4%25-brightgreen)
 
 `mobydig` (dig as in DNS dig) is a consumable Golang module (including a demo
 CLI) for diagnosing the reachability of other containers on Docker custom
