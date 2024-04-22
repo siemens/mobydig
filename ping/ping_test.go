@@ -60,7 +60,12 @@ var _ = Describe("pinger", Ordered, func() {
 	BeforeEach(func() {
 		goodgos := Goroutines()
 		DeferCleanup(func() {
-			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+			// Newer implementations of Go's std IP address resolution got
+			// progressively more complex, doing more stuff in the background
+			// even after we've cancelled the resolution process. In order to
+			// avoid false positives, we need to wait longer for go background
+			// functions to wind down.
+			Eventually(Goroutines).WithTimeout(10 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
 			Expect(Tasks()).To(BeUniformlyNamespaced())
 		})
@@ -214,7 +219,7 @@ var _ = Describe("pinger", Ordered, func() {
 				HaveValue(Equal(types.QualifiedAddressValue{
 					Address: addr,
 					Quality: verdict,
-				}))), "waiting for the train that never comes: address should be %s", verdict)
+				}))), "waited for the train that never came: address should be %s", verdict)
 			pinger.StopWait()
 			Eventually(courtTV).Should(BeClosed())
 		},

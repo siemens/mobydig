@@ -14,7 +14,7 @@ import (
 	"github.com/siemens/mobydig/types"
 
 	"github.com/gammazero/workerpool"
-	"github.com/go-ping/ping"
+	ping "github.com/prometheus-community/pro-bing"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/lxkns/ops/relations"
 	"github.com/thediveo/lxkns/species"
@@ -251,34 +251,20 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 			default:
 			}
 
-			pinger, err := ping.NewPinger(verdict.Addr())
-			if err != nil {
-				return err
-			}
+			pinger := ping.New(verdict.Addr()) // not! ping.NewPinger, would do an immediate resolve
 			pinger.SetPrivileged(!p.unprivileged)
 			pinger.Count = p.count
 			pinger.Interval = p.interval
 			// Always limit waiting for the last ping to get reflected (or not)!
-			pinger.Timeout = time.Duration(int64(p.interval) * int64(p.count+2))
-			// While the ping will be running, we need to monitor the context in
-			// case it becomes "done" by either getting cancelled or reaching
-			// its deadline. The done channel here works "the other way round"
-			// in the sense that it terminated the concurrent context
-			// monitoring.
-			done := make(chan struct{})
-			defer close(done)
-			go func() {
-				select {
-				case <-ctx.Done():
-					pinger.Stop()
-				case <-done:
-				}
-			}()
+			timeout := time.Duration(int64(p.interval) * int64(p.count+2))
+			pinger.ResolveTimeout = timeout
+			pingctx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
 			// Now start making some noise...
-			if err = pinger.Run(); err != nil {
+			if err := pinger.RunWithContext(pingctx); err != nil {
 				return err
 			}
-			// Was the context done?
+			// Was the overall validation context done?
 			if err := ctx.Err(); err != nil {
 				return err
 			}
