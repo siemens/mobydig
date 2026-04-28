@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gosuri/uilive"
+	"github.com/moby/moby/client"
+
 	"github.com/siemens/mobydig/dig"
 	"github.com/siemens/mobydig/mobynet"
 	"github.com/siemens/mobydig/verifier"
-
-	"github.com/docker/docker/client"
-	"github.com/gosuri/uilive"
 )
 
 // DigAndReport locates a “starting point” container by its name and then looks
@@ -23,9 +23,8 @@ import (
 // perspective of the center container. Finally, the addresses are verified by
 // pinging them for good or bad.
 func DigAndReport(ctx context.Context, startpointName string) error {
-	cln, err := client.NewClientWithOpts(
+	cln, err := client.New(
 		client.WithHost("unix:///var/run/docker.sock"),
-		client.WithAPIVersionNegotiation(),
 	)
 	if err != nil {
 		return fmt.Errorf("cannot connect to the Docker daemon: %w", err)
