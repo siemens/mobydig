@@ -8,12 +8,12 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/docker/docker/client"
-	"github.com/onsi/gomega/gexec"
+	"github.com/moby/moby/client"
+	s "github.com/thediveo/success"
 
 	gi "github.com/onsi/ginkgo/v2"
 	g "github.com/onsi/gomega"
-	s "github.com/thediveo/success"
+	gx "github.com/onsi/gomega/gexec"
 )
 
 // MessyMobyLabel is the name of a “magic” label for tagging testing-related
@@ -25,9 +25,8 @@ const MessyMobyLabel = "messymoby"
 func NewClient() *client.Client {
 	gi.GinkgoHelper()
 
-	return s.Successful(client.NewClientWithOpts(
+	return s.Successful(client.New(
 		client.WithHost("unix:///var/run/docker.sock"),
-		client.WithAPIVersionNegotiation(),
 	))
 }
 
@@ -38,14 +37,14 @@ func DockerCompose(ctx context.Context, args ...string) {
 
 	args = append([]string{"compose"}, args...)
 	dc := exec.Command("docker", args...)
-	sess := s.Successful(gexec.Start(dc, gi.GinkgoWriter, gi.GinkgoWriter))
-	g.Eventually(sess).WithContext(ctx).Should(gexec.Exit(0))
+	sess := s.Successful(gx.Start(dc, gi.GinkgoWriter, gi.GinkgoWriter))
+	g.Eventually(sess).WithContext(ctx).Should(gx.Exit(0))
 }
 
 // Cleanup removes dead test containers as well as duplicate networks.
 func Cleanup(ctx context.Context) {
 	cln := NewClient()
-	defer cln.Close()
-	RemoveDeadTestContainers(ctx, cln, MessyMobyLabel)
-	RemoveDuplicateTestNetworks(ctx, cln, MessyMobyLabel)
+	defer func() { _ = cln.Close() }()
+	_ = RemoveDeadTestContainers(ctx, cln, MessyMobyLabel)
+	_ = RemoveDuplicateTestNetworks(ctx, cln, MessyMobyLabel)
 }

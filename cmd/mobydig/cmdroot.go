@@ -7,10 +7,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/thediveo/lxkns/log"
 )
 
 var (
@@ -40,8 +41,8 @@ func newRootCmd() (rootCmd *cobra.Command) {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if *debug {
-				log.SetLevel(log.DebugLevel)
-				log.Debugf("debug logging enabled")
+				slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})))
+				slog.Debug("debug logging enabled")
 			}
 			return DigAndReport(context.Background(), args[0])
 		},
