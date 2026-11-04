@@ -90,6 +90,7 @@ func (c *NamedAddressCache) Update(ctx context.Context, namaddr types.NamedAddre
 	}
 	// update quality
 	qc.q = namaddr.Qual()
+	qc.err = namaddr.Err()
 	// This address is already known, so now check if it is in validation or
 	// not. If in validation, then register the current FQDN as a consumer for a
 	// later quality update (if not already registered). If already
