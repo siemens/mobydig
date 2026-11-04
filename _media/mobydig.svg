@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>pandoras-box-2</title>
+  <defs>
+    <clipPath id="circle">
+      <circle cx="256" cy="256" r="250"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#circle)">
+    <!-- Sky -->
+    <rect width="512" height="512" fill="#8FD8F7"/>
+    <g transform="translate(0 -50)">
+
+    <!-- Sea -->
+    <rect y="240" width="512" height="340" fill="#2E9BD6"/>
+    <rect y="240" width="512" height="12" fill="#2585BF"/>
+
+    <!-- Whale tail in the distance -->
+    <path d="M112,262 C110,248 106,238 96,230 C108,232 116,238 120,246 C124,238 132,232 144,230 C134,238 130,248 128,262 Z" fill="#1F5F8B"/>
+    <path d="M100,264 q20,-8 40,0" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Wave marks -->
+    <g fill="none" stroke="#7CCBF0" stroke-width="4" stroke-linecap="round">
+      <path d="M40,300 q10,-8 20,0 q10,-8 20,0"/>
+      
+    </g>
+
+    <!-- Beach -->
+    <path d="M512,240 C414,246 362,290 344,420 C338,450 332,480 329,512 L326,570 L512,570 Z" fill="#E3BC6C"/>
+    <path d="M512,250 C430,256 378,300 360,420 C354,450 348,480 345,512 L342,570 L512,570 Z" fill="#F6D88F"/>
+    <g fill="#E3BC6C">
+      <circle cx="440" cy="330" r="3"/>
+      <circle cx="475" cy="370" r="3"/>
+      <circle cx="400" cy="470" r="3"/>
+      <circle cx="450" cy="430" r="3"/>
+      <circle cx="380" cy="440" r="3"/>
+    </g>
+
+    <!-- Container shadow on sand -->
+    <ellipse cx="420" cy="394" rx="52" ry="9" fill="#D9AE5C"/>
+
+    <!-- Shipping container -->
+    <g transform="translate(204 326) scale(1.7) translate(-250 -350)">
+    <g transform="rotate(-9 245 370)">
+      <!-- top face -->
+      <polygon points="100,300 132,278 402,278 370,300" fill="#4A7FC1"/>
+      <!-- end face -->
+      <polygon points="370,300 402,278 402,398 370,420" fill="#143461"/>
+      <g stroke="#0E2747" stroke-width="4" stroke-linecap="round">
+        <line x1="380" y1="300" x2="380" y2="406"/>
+        <line x1="392" y1="292" x2="392" y2="398"/>
+      </g>
+      <!-- side face -->
+      <rect x="100" y="300" width="270" height="120" fill="#235A9E"/>
+      <g stroke="#1B4A85" stroke-width="7">
+        <line x1="118" y1="308" x2="118" y2="412"/>
+        <line x1="136" y1="308" x2="136" y2="412"/>
+        <line x1="154" y1="308" x2="154" y2="412"/>
+        <line x1="172" y1="308" x2="172" y2="412"/>
+        <line x1="190" y1="308" x2="190" y2="412"/>
+        <line x1="208" y1="308" x2="208" y2="412"/>
+        <line x1="226" y1="308" x2="226" y2="412"/>
+        <line x1="244" y1="308" x2="244" y2="412"/>
+        <line x1="262" y1="308" x2="262" y2="412"/>
+        <line x1="280" y1="308" x2="280" y2="412"/>
+        <line x1="298" y1="308" x2="298" y2="412"/>
+        <line x1="316" y1="308" x2="316" y2="412"/>
+        <line x1="334" y1="308" x2="334" y2="412"/>
+        <line x1="352" y1="308" x2="352" y2="412"/>
+      </g>
+      <rect x="100" y="300" width="270" height="9" fill="#143461"/>
+      <rect x="100" y="411" width="270" height="9" fill="#143461"/>
+      <!-- corner castings -->
+      <g fill="#0B1E38">
+        <rect x="100" y="300" width="12" height="12" rx="2"/>
+        <rect x="358" y="300" width="12" height="12" rx="2"/>
+        <rect x="100" y="408" width="12" height="12" rx="2"/>
+        <rect x="358" y="408" width="12" height="12" rx="2"/>
+        <rect x="392" y="278" width="10" height="10" rx="2"/>
+        <rect x="392" y="388" width="10" height="10" rx="2"/>
+      </g>
+
+      <!-- "HELLO my name is" badge -->
+      <g transform="translate(244 358)">
+        <rect x="-86" y="-44" width="172" height="88" rx="12" fill="#0D2242" stroke="#FFFFFF" stroke-width="3"/>
+        <text x="0" y="-19" text-anchor="middle" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="22" fill="#FFFFFF" letter-spacing="1">HELLO</text>
+        <text x="0" y="-5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="11" fill="#FFFFFF">my name is</text>
+        <rect x="-77" y="1" width="154" height="34" rx="4" fill="#FFFFFF"/>
+        <text x="0" y="24" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', cursive" font-weight="700" font-size="19" fill="#1B2A49" textLength="142" lengthAdjust="spacingAndGlyphs">pandoras-box-2</text>
+      </g>
+    </g>
+    </g>
+
+    <!-- Foreground water: level waterline across the sunken end -->
+    <path d="M0,420 q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 C354,450 348,480 345,512 L342,570 L0,570 Z" fill="#2E9BD6"/>
+    <!-- foam where the waterline meets the container -->
+    <path d="M0,420 q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- wash along the shoreline -->
+    <path d="M360,420 C354,450 348,480 345,512 L342,570" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+    <g fill="none" stroke="#7CCBF0" stroke-width="4" stroke-linecap="round">
+      <path d="M60,452 q10,-8 20,0 q10,-8 20,0"/>
+      <path d="M250,472 q10,-8 20,0 q10,-8 20,0"/>
+    </g>
+    <!-- Shark fin -->
+    <g transform="translate(6 20)">
+    <path d="M116,476 C130,448 152,420 186,411 Q194,410 190,417 C180,436 182,460 198,476 Z" fill="#4A5B70"/>
+    <path d="M190,417 C180,436 182,460 198,476 L186,476 C172,460 172,434 186,411 Q194,410 190,417 Z" fill="#37465A"/>
+    <path d="M98,478 q8,-6 18,-2 M198,476 q10,-4 18,2" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+    <path d="M110,480 q44,-6 90,0" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    </g>
+  </g>
+
+  <!-- Outline ring -->
+  <circle cx="256" cy="256" r="250" fill="none" stroke="#1B2A49" stroke-width="10"/>
+</svg>

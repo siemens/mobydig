@@ -1,3 +1,5 @@
+<img align="right" width="150" height="150" src="_media/mobydig-150x150.png" style="padding: 0 0 1ex 0.8em">
+
 [![Siemens](https://img.shields.io/badge/github-siemens-009999?logo=github)](https://github.com/siemens)
 [![Industrial Edge](https://img.shields.io/badge/github-industrial%20edge-e39537?logo=github)](https://github.com/industrial-edge)
 [![Edgeshark](https://img.shields.io/badge/github-Edgeshark-003751?logo=github)](https://github.com/siemens/edgeshark)
@@ -8,27 +10,29 @@
 [![GitHub](https://img.shields.io/github/license/siemens/mobydig)](https://img.shields.io/github/license/siemens/mobydig)
 ![build and test](https://github.com/siemens/mobydig/actions/workflows/buildandtest.yaml/badge.svg?branch=main)
 ![file descriptors](https://img.shields.io/badge/go%20routines-not%20leaking-success)
-[![Go Report Card](https://goreportcard.com/badge/github.com/siemens/mobydig)](https://goreportcard.com/report/github.com/siemens/mobydig)
 ![Coverage](https://img.shields.io/badge/Coverage-84.8%25-brightgreen)
 
-`mobydig` (dig as in DNS dig) is a consumable Golang module (including a demo
-CLI) for diagnosing the reachability of other containers on Docker custom
+`mobydig` (_dig_ as in DNS `dig`) is a consumable Golang module (including a
+demo CLI) for diagnosing the reachability of other containers on Docker custom
 networks directly reachable from a particular Docker container:
 - on these directly attached custom networks, what are the DNS names of other
   containers and (Docker compose) services?
 - are the corresponding IP addresses reachable?
 
-`mobydig` is part of the "Edgeshark" project that consist of several
+## Edgeshark Project
+
+The mobydig module is part of the "Edgeshark" project that consist of several
 repositories:
-- [Edgeshark Hub repository](https://github.com/siemens/edgeshark)
-- [G(h)ostwire discovery service](https://github.com/siemens/ghostwire)
+- [Edgeshark Hub repository](https://github.com/siemens/edgeshark) with
+  Edgeshark Industrial Edge App.
+- [Ghostwire discovery service](https://github.com/siemens/ghostwire)
 - [Packetflix packet streaming service](https://github.com/siemens/packetflix)
 - [Containershark Extcap plugin for
   Wireshark](https://github.com/siemens/cshargextcap)
-- support modules:
-  - [csharg (CLI)](https://github.com/siemens/csharg)
-  - 🖝 **mobydig** 🖜
-  - [ieddata](https://github.com/siemens/ieddata)
+- [Turtlefinder](https://github.com/siemens/turtlefinder)
+- [csharg (CLI)](https://github.com/siemens/csharg)
+- **mobydig**
+- [ieddata](https://github.com/siemens/ieddata)
 
 ## Usage
 
