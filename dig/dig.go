@@ -7,10 +7,10 @@ package dig
 import (
 	"context"
 
+	"github.com/miekg/dns"
+
 	"github.com/siemens/mobydig/dnsworker"
 	"github.com/siemens/mobydig/types"
-
-	"github.com/miekg/dns"
 )
 
 // Digger digs the IPv4 and IPv6 addresses of FQDNs and then streams its

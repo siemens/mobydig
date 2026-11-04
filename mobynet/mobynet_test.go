@@ -29,9 +29,8 @@ var _ = Describe("Docker networks", func() {
 	})
 
 	It("discovers attached networks with their containers", NodeTimeout(30*time.Second), func(ctx context.Context) {
-		cln := Successful(client.NewClientWithOpts(
+		cln := Successful(client.New(
 			client.WithHost("unix:///var/run/docker.sock"),
-			client.WithAPIVersionNegotiation(),
 		))
 		defer func() { _ = cln.Close() }()
 		dnets, _ := Successful2R(DiscoverAttachedNames(ctx, cln, "test-test-1"))

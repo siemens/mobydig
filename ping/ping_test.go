@@ -11,9 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/siemens/mobydig/dnsworker"
-	"github.com/siemens/mobydig/types"
-
 	"github.com/miekg/dns"
 	"github.com/thediveo/lxkns/containerizer/whalefriend"
 	"github.com/thediveo/lxkns/discover"
@@ -23,6 +20,9 @@ import (
 	"github.com/thediveo/nonstd/sets"
 	"github.com/thediveo/whalewatcher/v2/watcher"
 	"github.com/thediveo/whalewatcher/v2/watcher/moby"
+
+	"github.com/siemens/mobydig/dnsworker"
+	"github.com/siemens/mobydig/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -74,7 +74,7 @@ var _ = Describe("pinger", Ordered, func() {
 
 	It("handles multiple stops", func() {
 		pinger, _ := New(1)
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			By(fmt.Sprintf("%d round", i+1))
 			done := make(chan struct{})
 			go func() {
@@ -146,7 +146,7 @@ var _ = Describe("pinger", Ordered, func() {
 		pinger, courtTV := New(3)
 		inch := make(chan types.QualifiedAddress)
 		go func() {
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				inch <- &types.NamedAddressValue{
 					FQDN:                  strconv.Itoa(i),
 					QualifiedAddressValue: types.QualifiedAddressValue{Address: "localhost"},
@@ -181,7 +181,7 @@ var _ = Describe("pinger", Ordered, func() {
 			var addr string
 			// We don't rely on the DnsPool workers to correctly switch network
 			// namespaces, so we do it ourselves here... ;)
-			Expect(ops.Execute(func() interface{} {
+			Expect(ops.Execute(func() any {
 				defer GinkgoRecover()
 				By("resolving a container's name from inside another container")
 
@@ -206,7 +206,7 @@ var _ = Describe("pinger", Ordered, func() {
 				}
 				addr = addrs[0]
 				return nil
-			}, testnetnsref)).To(Succeed())
+			}, testnetnsref)).Error().NotTo(HaveOccurred())
 			By(fmt.Sprintf("pinging %v", addr))
 			pinger.Validate(ctx, addr)
 			By("waiting for intermediate verification in-progress verdict")

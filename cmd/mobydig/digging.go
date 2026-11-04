@@ -106,5 +106,5 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 // flushes) it to the terminal.
 func renderData(term *uilive.Writer, r *renderer, data *dig.NamedAddressesMap) {
 	r.Render(data.Get())
-	term.Flush()
+	_ = term.Flush()
 }

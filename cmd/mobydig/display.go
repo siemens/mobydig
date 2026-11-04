@@ -49,7 +49,7 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 	// If we don't have any name+addressing information yet, show a proxy
 	// message.
 	if len(groups) == 0 {
-		fmt.Fprintf(r.w, "inspecting container %s and its networks...\n", r.centerName)
+		_, _ = fmt.Fprintf(r.w, "inspecting container %s and its networks...\n", r.centerName)
 		return
 	}
 	// For neat display, determine the length of the longest FQDN in the data to
@@ -64,25 +64,25 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 		}
 	}
 	// Render list of attached networks...
-	fmt.Fprintf(r.w, "networks attached to container %s: ", r.centerName)
+	_, _ = fmt.Fprintf(r.w, "networks attached to container %s: ", r.centerName)
 	for idx, group := range groups {
 		if idx == 0 {
 			continue // skip unnamed group
 		}
 		if idx >= 2 {
-			fmt.Fprint(r.w, " ")
+			_, _ = fmt.Fprint(r.w, " ")
 		}
-		fmt.Fprint(r.w, networkNameStyle.Styled(groupName(group[0].FQDN)))
+		_, _ = fmt.Fprint(r.w, networkNameStyle.Styled(groupName(group[0].FQDN)))
 	}
-	fmt.Fprintln(r.w)
+	_, _ = fmt.Fprintln(r.w)
 	// Render the network groups...
 	for _, group := range groups {
 		gn := groupName(group[0].FQDN)
 		switch gn {
 		case "":
-			fmt.Fprint(r.w, "DNS names for containers/services on any attached network\n")
+			_, _ = fmt.Fprint(r.w, "DNS names for containers/services on any attached network\n")
 		default:
-			fmt.Fprintf(r.w, "DNS names for containers/services on network %s\n", networkNameStyle.Styled(gn))
+			_, _ = fmt.Fprintf(r.w, "DNS names for containers/services on network %s\n", networkNameStyle.Styled(gn))
 		}
 		for _, na := range group {
 			r.renderGroupDetails(maxlen, na)
@@ -92,23 +92,23 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 
 // renderGroupDetails renders a network group's labels and qualified addresses.
 func (r *renderer) renderGroupDetails(labelwidth int, na dig.NamedAddressSet) {
-	fmt.Fprintf(r.w, "%-*s%-*s", r.Indentation, "", labelwidth, strings.TrimSuffix(na.FQDN, "."))
+	_, _ = fmt.Fprintf(r.w, "%-*s%-*s", r.Indentation, "", labelwidth, strings.TrimSuffix(na.FQDN, "."))
 	for idx, addr := range na.Addresses {
 		if idx > 0 {
-			fmt.Fprint(r.w, " ")
+			_, _ = fmt.Fprint(r.w, " ")
 		}
 		switch addr.Quality {
 		case types.Unverified:
-			fmt.Fprintf(r.w, " ? %s", addr.Address)
+			_, _ = fmt.Fprintf(r.w, " ? %s", addr.Address)
 		case types.Verifying:
-			fmt.Fprint(r.w, verifyingAddressStyle.Styled(" "+r.spinner.Spinner()+addr.Address+" "))
+			_, _ = fmt.Fprint(r.w, verifyingAddressStyle.Styled(" "+r.spinner.Spinner()+addr.Address+" "))
 		case types.Verified:
-			fmt.Fprint(r.w, validAddressStyle.Styled(" ✔ "+addr.Address+" "))
+			_, _ = fmt.Fprint(r.w, validAddressStyle.Styled(" ✔ "+addr.Address+" "))
 		case types.Invalid:
-			fmt.Fprint(r.w, invalidAddressStyle.Styled(" × "+addr.Address+" "))
+			_, _ = fmt.Fprint(r.w, invalidAddressStyle.Styled(" × "+addr.Address+" "))
 		}
 	}
-	fmt.Fprintln(r.w)
+	_, _ = fmt.Fprintln(r.w)
 }
 
 // sortQualifiedAddresses sorts a slice of qualified address in place.

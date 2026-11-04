@@ -54,7 +54,7 @@ var _ = Describe("DNS client connection pool", func() {
 		}
 
 		numtasks := poolsize * 2
-		for i := 0; i < numtasks; i++ {
+		for range numtasks {
 			pool.Submit(taskfn)
 		}
 

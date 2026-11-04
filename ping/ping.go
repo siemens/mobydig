@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/siemens/mobydig/types"
-
 	"github.com/gammazero/workerpool"
 	ping "github.com/prometheus-community/pro-bing"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/lxkns/ops/relations"
 	"github.com/thediveo/lxkns/species"
+
+	"github.com/siemens/mobydig/types"
 )
 
 // Pinger validates IP addresses by pinging them and then streaming the final
@@ -99,7 +99,7 @@ func WithInterval(interval time.Duration) PingerOption {
 	}
 }
 
-// Unprivileged tells the Pinger to carry out unprivileged pings using UDP
+// AsUnprivileged tells the Pinger to carry out unprivileged pings using UDP
 // instead of ICMP packet.
 func AsUnprivileged() PingerOption {
 	return func(p *Pinger) {
@@ -242,7 +242,7 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 				return
 			}
 		}()
-		ping := func() interface{} {
+		ping := func() any {
 			// A quick and non-blocking check to see if the context has been
 			// cancelled before we start our work...
 			select {
@@ -283,7 +283,7 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 			// We use this function result to return ping errors, so we now need
 			// to use the ping-related error (unless there is an Execute-related
 			// error) to trigger the final invalid verdict.
-			var pingerr interface{}
+			var pingerr any
 			pingerr, err = ops.Execute(ping, p.netns)
 			if err == nil && pingerr != nil {
 				if fnerr, ok := pingerr.(error); ok {

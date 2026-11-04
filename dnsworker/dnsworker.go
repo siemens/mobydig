@@ -54,8 +54,8 @@ func New(ctx context.Context, size int, dnsclnt *dns.Client, addr string, option
 	// Create the DNS client connections for the workers ... please note that we
 	// might
 	free := make([]*dns.Conn, 0, size)
-	dial := func() interface{} {
-		for i := 0; i < size; i++ {
+	dial := func() any {
+		for range size {
 			conn, err := dnsclnt.DialContext(ctx, addr)
 			if err != nil {
 				// Immediately release all connections created so far.
@@ -70,7 +70,7 @@ func New(ctx context.Context, size int, dnsclnt *dns.Client, addr string, option
 	}
 	// Dial the connections in the requested network namespace, if necessary.
 	var err error
-	var dialerr interface{}
+	var dialerr any
 	if dnspool.netns != nil {
 		dialerr, err = ops.Execute(dial, dnspool.netns)
 	} else {
