@@ -37,7 +37,7 @@ func (q Quality) String() string {
 // or unsuccessfully verified.
 func (q Quality) IsPending() bool {
 	switch q {
-	case Unverified, Verified:
+	case Unverified, Verifying:
 		return true
 	default:
 		return false
