@@ -216,11 +216,10 @@ var _ = Describe("pinger", Ordered, func() {
 					Quality: types.Verifying,
 				}))))
 			By("waiting for final invalidation verdict")
-			Eventually(courtTV).WithTimeout(10*time.Second).Should(Receive(
-				HaveValue(Equal(types.QualifiedAddressValue{
-					Address: addr,
-					Quality: verdict,
-				}))), "waited for the train that never came: address should be %s", verdict)
+			Eventually(courtTV).WithTimeout(10*time.Second).Should(Receive(SatisfyAll(
+				HaveField("Address", addr),
+				HaveField("Quality", verdict),
+			)), "waited for the train that never came: address should be %s", verdict)
 			pinger.StopWait()
 			Eventually(courtTV).Should(BeClosed())
 		},
