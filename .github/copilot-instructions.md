@@ -20,6 +20,8 @@ For sets, use `sets.Set[T]` from `github.com/thediveo/nonstd/sets` instead of `m
 
 Every package's doc comment (the `/* Package <name> ... */` comment preceding the `package` clause) must live in its own dedicated `doc.go` file containing nothing but that comment and the `package` clause. Do not attach package doc comments to files that also contain other declarations.
 
+For commands (`package main`), the `doc.go` comment must instead use Go's command documentation format: start with the capitalized command name (for example, `/* Mobydig digs ... */`), followed by a usage section and a description of the flags.
+
 ## Code Formatting
 
 When formatting Go code, use the custom formatting tool configured in `gostwire.code-workspace`:
