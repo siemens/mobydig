@@ -17,11 +17,7 @@
         "ghcr.io/thediveo/devcontainer-features/pinact:0": {},
         "ghcr.io/thediveo/devcontainer-features/go-mod-upgrade:1": {},
         "ghcr.io/thediveo/devcontainer-features/lazygit:0": {},
-        "ghcr.io/thediveo/devcontainer-features/docsify:0": {
-            "port": "3300",
-            "livereload-port": "3301"
-        },
-        "ghcr.io/thediveo/devcontainer-features/goreportcard:0": {},
+        "ghcr.io/thediveo/devcontainer-features/goreportcard:1": {},
         "ghcr.io/devcontainers/features/docker-in-docker:4": {
             "version": "latest",
             "moby": false // go for the upstream Docker-CE
