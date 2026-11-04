@@ -20,6 +20,7 @@ import (
 	"github.com/thediveo/lxkns/model"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/lxkns/species"
+	"github.com/thediveo/nonstd/sets"
 	"github.com/thediveo/whalewatcher/v2/watcher"
 	"github.com/thediveo/whalewatcher/v2/watcher/moby"
 
@@ -157,11 +158,11 @@ var _ = Describe("pinger", Ordered, func() {
 			pinger.ValidateStream(inch)
 			pinger.StopWait()
 		}()
-		i := map[string]struct{}{}
+		i := sets.New[string]()
 		for qa := range courtTV {
-			na := qa.(types.NamedAddress).NA()
+			na := AssignableTo[types.NamedAddress](qa).NA()
 			if !na.Quality.IsPending() {
-				i[na.FQDN] = struct{}{}
+				i.Add(na.FQDN)
 			}
 		}
 		Expect(i).To(HaveLen(5))

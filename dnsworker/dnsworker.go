@@ -60,7 +60,7 @@ func New(ctx context.Context, size int, dnsclnt *dns.Client, addr string, option
 			if err != nil {
 				// Immediately release all connections created so far.
 				for _, conn := range free {
-					conn.Close()
+					_ = conn.Close()
 				}
 				return err
 			}
@@ -187,7 +187,7 @@ func (p *DnsPool) StopWait() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, conn := range p.free {
-		conn.Close()
+		_ = conn.Close()
 	}
 	p.free = nil
 }

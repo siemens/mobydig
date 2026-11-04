@@ -33,7 +33,7 @@ var _ = Describe("Docker networks", func() {
 			client.WithHost("unix:///var/run/docker.sock"),
 			client.WithAPIVersionNegotiation(),
 		))
-		defer cln.Close()
+		defer func() { _ = cln.Close() }()
 		dnets, _ := Successful2R(DiscoverAttachedNames(ctx, cln, "test-test-1"))
 		Expect(dnets).To(ContainElements(
 			And(

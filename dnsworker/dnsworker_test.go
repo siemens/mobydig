@@ -125,11 +125,10 @@ var _ = Describe("DNS client connection pool", func() {
 		Expect(testcntr).NotTo(BeNil(), "missing test-test-1 container")
 
 		dnsclnt := dns.Client{Net: "udp"}
-		pool, err := New(context.Background(),
+		pool := Successful(New(context.Background(),
 			1,
 			&dnsclnt, "127.0.0.11:53",
-			InNetworkNamespace(testcntr.Process.Namespaces[model.NetNS].Ref()[0]))
-		Expect(err).NotTo(HaveOccurred())
+			InNetworkNamespace(testcntr.Process.Namespaces[model.NetNS].Ref()[0])))
 		defer pool.StopWait()
 
 		ch := make(chan struct{})

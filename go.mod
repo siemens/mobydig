@@ -15,6 +15,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/thediveo/lxkns v0.48.0
 	github.com/thediveo/namspill v0.1.9
+	github.com/thediveo/nonstd v0.22.0
 	github.com/thediveo/success v1.4.0
 	github.com/thediveo/whalewatcher/v2 v2.1.1
 )
@@ -72,7 +73,6 @@ require (
 	github.com/thediveo/go-mntinfo v1.0.5 // indirect
 	github.com/thediveo/go-plugger/v3 v3.2.2 // indirect
 	github.com/thediveo/ioctl v0.9.5 // indirect
-	github.com/thediveo/nonstd v0.22.0 // indirect
 	github.com/thediveo/procfsroot v1.1.0 // indirect
 	github.com/thediveo/testily v0.11.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
