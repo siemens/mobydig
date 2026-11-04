@@ -268,8 +268,7 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			stats := pinger.Statistics()
-			if stats.PacketsRecv < pinger.Count*int(p.thresholdPercentage)/100 {
+			if !enoughReplies(pinger.Statistics().PacketsRecv, pinger.Count, p.thresholdPercentage) {
 				return errors.New("no replies or too many losses")
 			}
 			verdict = verdict.WithNewQuality(types.Verified, nil)
@@ -310,4 +309,10 @@ func (p *Pinger) StopWait() {
 		p.workers.StopWait()
 		close(p.courtTV)
 	})
+}
+
+// enoughReplies returns true if the received replies reach the threshold
+// percentage of the sent pings, avoiding integer truncation.
+func enoughReplies(received, sent int, thresholdPercentage uint) bool {
+	return received*100 >= sent*int(thresholdPercentage)
 }
