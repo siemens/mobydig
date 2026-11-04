@@ -7,7 +7,9 @@
 	"settings": {
 		"go.lintTool": "golangci-lint-v2",
 		"go.alternateTools": {
-			"customFormatter": "golangci-lint-v2"
+			// golangci-lint on PATH instead of vscode-go's possibly stale own install.
+			"golangci-lint-v2": "golangci-lint",
+			"customFormatter": "golangci-lint"
 		},
 		"go.formatTool": "custom",
 		"go.formatFlags": [
@@ -33,8 +35,5 @@
 		"markdown.styles": [
 			"./.vscode/markdown-preview.css"
 		],
-		"statsBar.memoUsage.format": "$(chip) ${used}/${total} ${unit}, ${percent}%",
-		"statsBar.location": "Right",
-		"makefile.extensionOutputFolder": "./.vscode"
-	}
+	},
 }
