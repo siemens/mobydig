@@ -78,7 +78,9 @@ When a test buffer might get written concurrently while expectations are checked
 
 ## End-to-End Tests
 
-End-to-end tests live in the `e2e/` package only and are opt-in: its suite skips itself unless the Ginkgo label filter explicitly selects the `e2e` label. Do not use build tags to gate them. `RunSpecs` already applies the `e2e` label suite-wide; use further labels (such as `k8s` or `tshark`) on specs to allow narrower selections.
+Lightweight end-to-end tests stay in their respective packages and run as part of the normal test runs. These are tests that use the shared docker compose test harness (`test/docker-compose.yaml`), which each package suite brings up in its `BeforeSuite` via `messymoby` and `test`. Specs requiring root must skip themselves when not running as root, for instance using `if os.Getuid() != 0 { Skip("needs root") }`.
+
+Any heavyweight end-to-end tests go into the `e2e/` package only and are opt-in: its suite skips itself unless the Ginkgo label filter explicitly selects the `e2e` label. Do not use build tags to gate them. `RunSpecs` already applies the `e2e` label suite-wide; use further labels (such as `k8s` or `tshark`) on specs to allow narrower selections.
 
 Run them explicitly, keeping the usual constraints:
 
