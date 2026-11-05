@@ -9,10 +9,14 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"unicode/utf8"
 
+	"github.com/rivo/uniseg"
 	"golang.org/x/sys/unix"
 )
+
+// eraseLine moves the cursor to the beginning of the current line and then
+// erases that line.
+const eraseLine = "\r\x1b[2K"
 
 // eraseLineAbove moves the cursor one line up and then erases that line.
 const eraseLineAbove = "\x1b[1A\x1b[2K"
@@ -22,13 +26,13 @@ const eraseLineAbove = "\x1b[1A\x1b[2K"
 var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 // Writer buffers output and on each Flush replaces the output of the previous
-// Flush with the newly buffered output. Flushed output is expected to end with
-// a newline.
+// Flush with the newly buffered output.
 type Writer struct {
-	out   io.Writer
-	width func() int // terminal width in columns, or 0 if unknown.
-	buf   bytes.Buffer
-	lines int // terminal lines occupied by the previously flushed output.
+	out     io.Writer
+	width   func() int // terminal width in columns, or 0 if unknown.
+	buf     bytes.Buffer
+	flushed bool
+	lines   int // terminal lines above the cursor after the previous flush.
 }
 
 // New returns a new Writer writing to out.
@@ -47,9 +51,13 @@ func (w *Writer) Write(p []byte) (int, error) {
 // Flush replaces the previously flushed output with the buffered output.
 func (w *Writer) Flush() error {
 	var out bytes.Buffer
-	for range w.lines {
-		out.WriteString(eraseLineAbove)
+	if w.flushed {
+		out.WriteString(eraseLine)
+		for range w.lines {
+			out.WriteString(eraseLineAbove)
+		}
 	}
+	w.flushed = true
 	w.lines = countLines(w.buf.Bytes(), w.width())
 	out.Write(w.buf.Bytes())
 	w.buf.Reset()
@@ -57,15 +65,16 @@ func (w *Writer) Flush() error {
 	return err
 }
 
-// countLines returns the number of terminal lines the newline-terminated lines
-// in text occupy, taking line wrapping at the specified width into account,
+// countLines returns the number of terminal lines above the cursor after text
+// has been written, taking line wrapping at the specified width into account,
 // unless width is 0.
 func countLines(text []byte, width int) int {
 	lines := 0
 	for {
 		idx := bytes.IndexByte(text, '\n')
 		if idx < 0 {
-			return lines
+			// the cursor stays in the last row of a trailing partial line.
+			return lines + rows(text, width) - 1
 		}
 		lines += rows(text[:idx], width)
 		text = text[idx+1:]
@@ -77,7 +86,7 @@ func rows(line []byte, width int) int {
 	if width <= 0 {
 		return 1
 	}
-	cols := utf8.RuneCount(ansiEscape.ReplaceAll(line, nil))
+	cols := uniseg.StringWidth(string(ansiEscape.ReplaceAll(line, nil)))
 	return max(1, (cols+width-1)/width)
 }
 

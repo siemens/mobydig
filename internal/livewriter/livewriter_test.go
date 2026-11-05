@@ -28,7 +28,7 @@ var _ = Describe("live writer", func() {
 		buf.Reset()
 		Expect(fmt.Fprint(w, "baz\n")).Error().NotTo(HaveOccurred())
 		Expect(w.Flush()).To(Succeed())
-		Expect(buf.String()).To(Equal(strings.Repeat(eraseLineAbove, 2) + "baz\n"))
+		Expect(buf.String()).To(Equal(eraseLine + strings.Repeat(eraseLineAbove, 2) + "baz\n"))
 	})
 
 	It("accounts for wrapped lines", func() {
@@ -40,7 +40,31 @@ var _ = Describe("live writer", func() {
 
 		buf.Reset()
 		Expect(w.Flush()).To(Succeed())
-		Expect(buf.String()).To(Equal(strings.Repeat(eraseLineAbove, 5)))
+		Expect(buf.String()).To(Equal(eraseLine + strings.Repeat(eraseLineAbove, 5)))
+	})
+
+	It("accounts for wide characters", func() {
+		var buf bytes.Buffer
+		w := New(&buf)
+		w.width = func() int { return 4 }
+		Expect(fmt.Fprint(w, "日本語\n")).Error().NotTo(HaveOccurred())
+		Expect(w.Flush()).To(Succeed())
+
+		buf.Reset()
+		Expect(w.Flush()).To(Succeed())
+		Expect(buf.String()).To(Equal(eraseLine + strings.Repeat(eraseLineAbove, 2)))
+	})
+
+	It("erases a trailing partial line", func() {
+		var buf bytes.Buffer
+		w := New(&buf)
+		w.width = func() int { return 3 }
+		Expect(fmt.Fprint(w, "foo\nbarbaz")).Error().NotTo(HaveOccurred())
+		Expect(w.Flush()).To(Succeed())
+
+		buf.Reset()
+		Expect(w.Flush()).To(Succeed())
+		Expect(buf.String()).To(Equal(eraseLine + strings.Repeat(eraseLineAbove, 2)))
 	})
 
 	It("reports write errors", func() {
