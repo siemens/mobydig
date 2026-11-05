@@ -16,7 +16,7 @@ import (
 // Digger digs the IPv4 and IPv6 addresses of FQDNs and then streams its
 // findings over its “news” channel.
 //
-// By connecting the news (output) channel of a Verifier to the input channel of
+// By connecting the news (output) channel of a Digger to the input channel of
 // a Verifier the reachability of the addresses dug can automatically be
 // verified by pinging them.
 type Digger struct {
@@ -26,8 +26,11 @@ type Digger struct {
 
 // New returns a new Digger with a maximum worker pool of the specified size as
 // well as a “news stream”. This news channel sends NamedAddress elements as
-// they are submitted for diggung, as well as the outcome(s) of the digs. Please
-// note that the returned results channel is never closed by a Digger itself.
+// they are submitted for digging, as well as the outcome(s) of the digs. The
+// news channel gets closed by [Digger.StopWait].
+//
+// If netnsref is empty, then digging takes place in the network namespace of
+// the caller.
 //
 // I dunno what Sir Tim, Mick, Phil, and all the others might think of our
 // digging here...
@@ -80,7 +83,7 @@ func (d *Digger) DigFQDNs(ctx context.Context, names []string) {
 		}
 		d.workers.ResolveName(ctx, name, func(addrs []string, err error) {
 			for _, addr := range addrs {
-				// Avoid blocking enless in case of the context getting
+				// Avoid blocking endlessly in case of the context getting
 				// cancelled.
 				select {
 				case d.news <- &types.NamedAddressValue{

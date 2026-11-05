@@ -6,6 +6,7 @@ package dig
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/siemens/mobydig/types"
@@ -28,7 +29,7 @@ type NamedAddressesMap struct {
 	mu sync.Mutex
 }
 
-// Get returns all named addresses from the map.
+// Get returns (a copy of) all named addresses from the map.
 func (m *NamedAddressesMap) Get() []NamedAddressSet {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -36,7 +37,7 @@ func (m *NamedAddressesMap) Get() []NamedAddressSet {
 	for name, addrs := range m.m {
 		sets = append(sets, NamedAddressSet{
 			FQDN:      name,
-			Addresses: addrs,
+			Addresses: slices.Clone(addrs),
 		})
 	}
 	return sets
