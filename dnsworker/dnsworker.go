@@ -20,6 +20,8 @@ import (
 // same DNS resolver address.
 type DnsPool struct {
 	netns   relations.Relation // network namespace to ping from, or nil.
+	dnsclnt *dns.Client
+	addr    string
 	workers *workerpool.WorkerPool
 	mu      sync.Mutex // protects the pool of DNS connections
 	free    []*dns.Conn
@@ -35,26 +37,31 @@ type DnsPoolOption func(*DnsPool)
 // DNS tasks are submitted using [DnsPool.Submit] in form of task functions
 // receiving a concrete [dns.Conn].
 //
-// The passed context is used for creating (dialing) the DNS client connections
-// only. It is not directly passed to the submitted DNS tasks, so task
-// submitters are themselves responsible for capturing the necessary context in
-// their task function closure.
+// The passed context is used for creating (dialing) the initial DNS client
+// connections only. It is not directly passed to the submitted DNS tasks, so
+// task submitters are themselves responsible for capturing the necessary
+// context in their task function closure.
+//
+// Connections that fail during name resolution get replaced by newly dialed
+// connections.
 //
 // To operate a DnsPool in a network namespace different to that of the OS-level
 // thread of the caller specify the [InNetworkNamespace] option and pass it a
 // filesystem path that must reference a network namespace (such as
 // "/proc/666/ns/net").
 func New(ctx context.Context, size int, dnsclnt *dns.Client, addr string, options ...DnsPoolOption) (*DnsPool, error) {
+	if size < 1 {
+		return nil, fmt.Errorf("DnsPool: size must be at least 1, got: %d", size)
+	}
 	dnspool := &DnsPool{
-		workers: workerpool.New(size),
+		dnsclnt: dnsclnt,
+		addr:    addr,
 	}
 	for _, opt := range options {
 		opt(dnspool)
 	}
-	// Create the DNS client connections for the workers ... please note that we
-	// might
 	free := make([]*dns.Conn, 0, size)
-	dial := func() any {
+	dialerr, err := inNetns(dnspool.netns, func() error {
 		for range size {
 			conn, err := dnsclnt.DialContext(ctx, addr)
 			if err != nil {
@@ -67,36 +74,67 @@ func New(ctx context.Context, size int, dnsclnt *dns.Client, addr string, option
 			free = append(free, conn)
 		}
 		return nil
-	}
-	// Dial the connections in the requested network namespace, if necessary.
-	var err error
-	var dialerr any
-	if dnspool.netns != nil {
-		dialerr, err = ops.Execute(dial, dnspool.netns)
-	} else {
-		dialerr = dial()
-	}
+	})
 	if err != nil {
 		return nil, err
 	}
 	if dialerr != nil {
-		return nil, dialerr.(error)
+		return nil, dialerr
 	}
 	dnspool.free = free
+	dnspool.workers = workerpool.New(size)
 	return dnspool, nil
 }
 
 // InNetworkNamespace optionally runs a DnsPool inside the network namespace
-// referenced by the specified filesystem path.
+// referenced by the specified filesystem path. An empty path leaves the DnsPool
+// in the network namespace of the caller.
 func InNetworkNamespace(netnsref string) DnsPoolOption {
 	return func(p *DnsPool) {
+		if netnsref == "" {
+			p.netns = nil
+			return
+		}
 		p.netns = ops.NewTypedNamespacePath(netnsref, species.CLONE_NEWNET)
 	}
+}
+
+// inNetns runs fn in the specified network namespace, or in the caller's
+// network namespace if netns is nil, returning fn's result.
+func inNetns[T any](netns relations.Relation, fn func() T) (T, error) {
+	if netns == nil {
+		return fn(), nil
+	}
+	return ops.Execute(fn, netns)
+}
+
+// redial returns a newly dialed DNS client connection.
+func (p *DnsPool) redial() (*dns.Conn, error) {
+	type dialResult struct {
+		conn *dns.Conn
+		err  error
+	}
+	res, err := inNetns(p.netns, func() dialResult {
+		conn, err := p.dnsclnt.Dial(p.addr)
+		return dialResult{conn: conn, err: err}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.conn, res.err
 }
 
 // Submit a task to the DNS client connection pool, where it gets enqueued to be
 // executed on an available DNS client connection.
 func (p *DnsPool) Submit(task func(conn *dns.Conn)) {
+	p.submit(func(conn *dns.Conn) bool {
+		task(conn)
+		return false
+	})
+}
+
+// submit enqueues a task that reports whether its connection is broken.
+func (p *DnsPool) submit(task func(conn *dns.Conn) (broken bool)) {
 	p.workers.Submit(func() { p.task(task) })
 }
 
@@ -111,12 +149,12 @@ func (p *DnsPool) Submit(task func(conn *dns.Conn)) {
 // Please note that when the passed context is cancelled this will cancel all
 // in-flight as well as scheduled name resolution jobs.
 func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string, error)) {
-	p.Submit(func(conn *dns.Conn) {
+	p.submit(func(conn *dns.Conn) (broken bool) {
 		var addrs []string
 		var err error
 		defer func() { fn(addrs, err) }() // ...ensure triggering the result callback on our way out
 
-		dnsclnt := dns.Client{}
+		name := dns.Fqdn(name) // TODO: search list???
 		nadanothing := true
 		for _, addrType := range []uint16{dns.TypeA, dns.TypeAAAA} {
 			// don't try to resolve the name if the context has been cancelled;
@@ -124,27 +162,31 @@ func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string
 			select {
 			case <-ctx.Done():
 				err = ctx.Err()
-				return
+				return false
 			default:
 			}
 
 			msg := dns.Msg{
 				MsgHdr: dns.MsgHdr{Id: dns.Id()},
 			}
-			name := dns.Fqdn(name)
-			msg.SetQuestion(name, addrType) // TODO: search list???
+			msg.SetQuestion(name, addrType)
 			var r *dns.Msg
-			r, _, err = dnsclnt.ExchangeWithConn(&msg, conn)
+			r, _, err = p.dnsclnt.ExchangeWithConnContext(ctx, &msg, conn)
 			if err != nil {
-				return
+				// a late reply might still arrive on this connection.
+				return true
+			}
+			if r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError {
+				err = fmt.Errorf("ResolveName: query for %q failed with %s",
+					name, dns.RcodeToString[r.Rcode])
+				return false
 			}
 			for _, rr := range r.Answer {
-				if addrRR, ok := rr.(*dns.A); ok {
+				switch addrRR := rr.(type) {
+				case *dns.A:
 					nadanothing = false
 					addrs = append(addrs, addrRR.A.String())
-					continue
-				}
-				if addrRR, ok := rr.(*dns.AAAA); ok {
+				case *dns.AAAA:
 					nadanothing = false
 					addrs = append(addrs, addrRR.AAAA.String())
 				}
@@ -156,12 +198,15 @@ func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string
 		if nadanothing {
 			err = fmt.Errorf("ResolveName: query for %q yields no answers", name)
 		}
+		return false
 	})
 }
 
 // task grabs the next free DNS client and passes it to the specified function.
-// After the function returns, the connection is put back into the free list.
-func (p *DnsPool) task(task func(conn *dns.Conn)) {
+// After the function returns, the connection is put back into the free list,
+// or replaced by a newly dialed connection in case the task reports it as
+// broken.
+func (p *DnsPool) task(task func(conn *dns.Conn) (broken bool)) {
 	// pop off a free DNS client connection,
 	// https://ueokande.github.io/go-slice-tricks/,
 	p.mu.Lock()
@@ -172,9 +217,14 @@ func (p *DnsPool) task(task func(conn *dns.Conn)) {
 	conn := p.free[last]
 	p.free = p.free[:last]
 	p.mu.Unlock()
-	// run the task with its assigned DNS client connection...
-	task(conn)
-	// ...and push the DNS client connection back into the free list.
+	if task(conn) {
+		_ = conn.Close()
+		// On redial failure keep the closed connection: the next task then fails
+		// fast and tries redialing again.
+		if newconn, err := p.redial(); err == nil {
+			conn = newconn
+		}
+	}
 	p.mu.Lock()
 	p.free = append(p.free, conn)
 	p.mu.Unlock()

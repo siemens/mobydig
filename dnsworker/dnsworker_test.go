@@ -35,6 +35,29 @@ var _ = Describe("DNS client connection pool", func() {
 		})
 	})
 
+	It("rejects an empty pool", func(ctx context.Context) {
+		Expect(New(ctx, 0, &dns.Client{}, "127.0.0.1:53")).Error().To(HaveOccurred())
+	})
+
+	It("stays in the caller's network namespace for an empty reference", func(ctx context.Context) {
+		pool := Successful(New(ctx, 1, &dns.Client{}, "127.0.0.1:53", InNetworkNamespace("")))
+		DeferCleanup(pool.StopWait)
+		Expect(pool.netns).To(BeNil())
+	})
+
+	It("replaces broken connections", func(ctx context.Context) {
+		pool := Successful(New(ctx, 1, &dns.Client{}, "127.0.0.1:53"))
+		var broken, next *dns.Conn
+		pool.submit(func(conn *dns.Conn) bool {
+			broken = conn
+			return true
+		})
+		pool.Submit(func(conn *dns.Conn) { next = conn })
+		pool.StopWait()
+		Expect(next).NotTo(BeNil())
+		Expect(next).NotTo(BeIdenticalTo(broken))
+	})
+
 	It("runs a goroutine-limited set of DNS tasks", NodeTimeout(30*time.Second), func(ctx context.Context) {
 		const poolsize = 3
 
