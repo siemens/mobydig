@@ -125,16 +125,3 @@ A change is not fully validated until:
 2. Root-mode tests pass.
 3. Runs were done with the race detector enabled.
 4. Runs were done without parallel suite execution.
-
-## Coverage Toolchain Problem
-
-With go1.27.3, coverage runs can fail with `internal error in coverage meta-data tracking: encountered bad pkgID: 0`, followed by `merging counters: len(dst)=N len(src)=1`; the package then FAILs although all of its specs pass. Known triggers:
-
-1. Setting the `gocover` devcontainer feature's `uncovered-packages` option, which switches to `-coverpkg` mode and corrupts the `cmd/mobydig` coverage data when run as root.
-2. Executable (init-time) statements in the `test/` package, which `cmd/mobydig` imports, under `go test -cover ./...`.
-
-Therefore, do not set `uncovered-packages`, and keep `test/` free of statements; `cmd/mobydig` instead adjusts the compose file path via its `composeArgs()` test helper. To reproduce:
-
-```bash
-go test -cover -coverpkg=<all packages except messymoby and test> -exec=sudo ./cmd/mobydig -args -test.gocoverdir=$(mktemp -d)
-```
