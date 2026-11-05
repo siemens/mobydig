@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"github.com/thediveo/nonstd/sets"
@@ -33,8 +34,11 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 		return nil, "", err
 	}
 
-	if containerDetails.Container.State.Pid == 0 {
+	if containerDetails.Container.State == nil || containerDetails.Container.State.Pid == 0 {
 		return nil, "", fmt.Errorf("container '%s' is not running", centerID)
+	}
+	if containerDetails.Container.NetworkSettings == nil {
+		return nil, "", fmt.Errorf("container '%s' lacks network settings", centerID)
 	}
 
 	containerDetails.Container.Name = strings.TrimPrefix(containerDetails.Container.Name, "/") // argh, Docker's "/name" legacy!
@@ -49,6 +53,9 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 	// reachable from container 0.
 	mobyNetworks := make([]dig.DockerNetwork, 0, len(containerDetails.Container.NetworkSettings.Networks))
 	for attachedNetName, attachedNet := range containerDetails.Container.NetworkSettings.Networks {
+		if attachedNet == nil {
+			continue
+		}
 		// Inspecting an attached network gives us all the (other) containers
 		// directly attached to that attached network (including container 0).
 		attNetDetails, err := moby.NetworkInspect(ctx, attachedNet.NetworkID, client.NetworkInspectOptions{})
@@ -80,14 +87,22 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 			if !ok {
 				details, err := moby.ContainerInspect(ctx, attachedContainer.Name, client.ContainerInspectOptions{})
 				if err != nil {
-					continue
+					if cerrdefs.IsNotFound(err) {
+						continue // container vanished in the meantime.
+					}
+					return nil, "", err
 				}
 				attachedContainerDetails = details.Container
 				containerDetailsCache[attachedContainer.Name] = attachedContainerDetails
 			}
 			namesOnNetwork.Add(attachedContainer.Name)
-			for _, alias := range attachedContainerDetails.NetworkSettings.Networks[attachedNetName].Aliases {
-				namesOnNetwork.Add(alias)
+			if attachedContainerDetails.NetworkSettings == nil {
+				continue
+			}
+			if endpoint := attachedContainerDetails.NetworkSettings.Networks[attachedNetName]; endpoint != nil {
+				for _, alias := range endpoint.Aliases {
+					namesOnNetwork.Add(alias)
+				}
 			}
 		}
 		// Add the DNS label-related information about this Docker network to

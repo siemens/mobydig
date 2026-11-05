@@ -3,6 +3,7 @@ module github.com/siemens/mobydig
 go 1.26.6
 
 require (
+	github.com/containerd/errdefs v1.0.0
 	github.com/gammazero/workerpool v1.3.0
 	github.com/gosuri/uilive v0.0.4
 	github.com/miekg/dns v1.1.73
@@ -31,7 +32,6 @@ require (
 	github.com/containerd/containerd/api v1.12.0 // indirect
 	github.com/containerd/containerd/v2 v2.4.0 // indirect
 	github.com/containerd/continuity v0.5.0 // indirect
-	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.2.0 // indirect
