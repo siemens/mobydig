@@ -106,7 +106,7 @@ var _ = Describe("pinger", Ordered, func() {
 
 	It("cancels address culture", NodeTimeout(30*time.Second), func(ctx context.Context) {
 		netnspath := testcntr.Process.Namespaces[model.NetNS].Ref()[0]
-		pinger, courtTV := new(1, 0,
+		pinger, courtTV := newPinger(1, 0,
 			InNetworkNamespace(netnspath),
 			WithCount(1),
 			WithInterval(500*time.Millisecond),
@@ -181,8 +181,7 @@ var _ = Describe("pinger", Ordered, func() {
 			var addr string
 			// We don't rely on the DnsPool workers to correctly switch network
 			// namespaces, so we do it ourselves here... ;)
-			Expect(ops.Execute(func() any {
-				defer GinkgoRecover()
+			Expect(ops.Visit(func() {
 				By("resolving a container's name from inside another container")
 
 				dnsclnt := dns.Client{}
@@ -202,11 +201,10 @@ var _ = Describe("pinger", Ordered, func() {
 				addrs := <-ch
 				if len(addrs) == 0 {
 					addr = name // expected case; use the non-existing DNS name instead of an IP literal
-					return nil
+					return
 				}
 				addr = addrs[0]
-				return nil
-			}, testnetnsref)).Error().NotTo(HaveOccurred())
+			}, testnetnsref)).To(Succeed())
 			By(fmt.Sprintf("pinging %v", addr))
 			pinger.Validate(ctx, addr)
 			By("waiting for intermediate verification in-progress verdict")
