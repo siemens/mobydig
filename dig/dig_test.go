@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/namspill"
 	. "github.com/thediveo/success"
 )
@@ -55,11 +56,14 @@ var _ = Describe("digging in the (address) dirt", Ordered, func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			// cancelling a dig can take some time for all associated goroutines
 			// to finally terminate...
 			Eventually(Goroutines).Within(3 * time.Second).ProbeEvery(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).Within(3 * time.Second).ProbeEvery(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 			// safeguard to catch incorrect OS-level thread locking and
 			// unlocking across switching network namespaces.
 			Expect(Tasks()).To(BeUniformlyNamespaced())

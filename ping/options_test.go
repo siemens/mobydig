@@ -5,11 +5,22 @@
 package ping
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gleak"
 )
 
 var _ = Describe("pinger options", func() {
+
+	BeforeEach(func() {
+		goodgos := Goroutines()
+		DeferCleanup(func() {
+			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeaked(goodgos))
+		})
+	})
 
 	It("treats a zero count as one", func() {
 		p, _ := newPinger(1, 0, WithCount(0))

@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/namspill"
 	. "github.com/thediveo/success"
 )
@@ -60,6 +61,7 @@ var _ = Describe("pinger", Ordered, func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			// Newer implementations of Go's std IP address resolution got
 			// progressively more complex, doing more stuff in the background
@@ -68,6 +70,8 @@ var _ = Describe("pinger", Ordered, func() {
 			// functions to wind down.
 			Eventually(Goroutines).WithTimeout(10 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 			Expect(Tasks()).To(BeUniformlyNamespaced())
 		})
 	})

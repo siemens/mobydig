@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/success"
 )
 
@@ -20,11 +21,14 @@ var _ = Describe("Docker networks", func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			// cancelling a dig can take some time for all associated goroutines
 			// to finally terminate...
 			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 		})
 	})
 

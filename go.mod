@@ -14,6 +14,7 @@ require (
 	github.com/onsi/gomega v1.44.0
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/spf13/cobra v1.10.2
+	github.com/thediveo/fdooze v0.3.4
 	github.com/thediveo/lxkns v0.48.0
 	github.com/thediveo/namspill v0.1.9
 	github.com/thediveo/nonstd v0.22.0

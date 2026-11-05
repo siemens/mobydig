@@ -13,9 +13,22 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 )
 
 var _ = Describe("verifier", func() {
+
+	BeforeEach(func() {
+		goodgos := Goroutines()
+		goodfds := Filedescriptors()
+		DeferCleanup(func() {
+			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
+		})
+	})
 
 	It("verifies a stream of named addresses", NodeTimeout(30*time.Second), func(ctx context.Context) {
 		vf, news := New(2, "")
