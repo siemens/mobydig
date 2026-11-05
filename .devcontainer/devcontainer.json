@@ -60,7 +60,8 @@
                 "dnut.rewrap-revived",
                 "brunnerh.insert-unicode",
                 "mhutchie.git-graph",
-                "docker.docker"
+                "docker.docker",
+                "ms-vscode.live-server"
             ]
         }
     }
