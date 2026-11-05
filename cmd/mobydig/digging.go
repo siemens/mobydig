@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/client"
+	"github.com/thediveo/nonstd/xslices"
 
 	"github.com/siemens/mobydig/dig"
 	"github.com/siemens/mobydig/internal/livewriter"
@@ -39,10 +40,10 @@ func DigAndReport(ctx context.Context, out io.Writer, startpointName string) err
 	trackingDone := make(chan struct{})
 	renderingDone := make(chan struct{})
 
+	term := livewriter.New(out)
+	renderer := newRenderer(term, startpointName)
+	renderer.Indentation = int(*indentation)
 	go func() {
-		term := livewriter.New(out)
-		renderer := newRenderer(term, startpointName)
-		renderer.Indentation = int(*indentation)
 		defer func() {
 			renderData(term, renderer, namaddrs)
 			renderer.Stop()
@@ -69,6 +70,7 @@ func DigAndReport(ctx context.Context, out io.Writer, startpointName string) err
 		stopRendering()
 		return fmt.Errorf("cannot discover attached networks and their containers: %w", err)
 	}
+	renderer.SetNetworks(xslices.Map(attachedNets, func(n dig.DockerNetwork) string { return n.Label }))
 
 	// Now lets put the required processing elements and their plumbing in
 	// place.

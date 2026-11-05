@@ -68,6 +68,26 @@ var _ = Describe("rendering", func() {
 		))
 	})
 
+	It("renders unresolvable names", func() {
+		var buf bytes.Buffer
+		r := &renderer{w: &buf, centerName: "c0", spinner: newSpinner()}
+		r.Render([]dig.NamedAddressSet{{FQDN: "foo.", Error: "no answers"}})
+		Expect(buf.String()).To(ContainSubstring("× unresolvable"))
+	})
+
+	DescribeTable("groups FQDNs by network",
+		func(fqdn string, group string, label string) {
+			g, l := groupAndLabel([]string{"net", "my.net"}, fqdn)
+			Expect(g).To(Equal(group))
+			Expect(l).To(Equal(label))
+		},
+		Entry(nil, "foo.", "", "foo"),
+		Entry(nil, "foo.net.", "net", "foo"),
+		Entry(nil, "foo.my.net.", "my.net", "foo"),
+		Entry(nil, "foo.bar.net.", "net", "foo.bar"),
+		Entry(nil, "my.net.", "net", "my"),
+	)
+
 	It("sorts IPv4 before IPv6 addresses", func() {
 		addrs := []types.QualifiedAddressValue{
 			{Address: "fe80::1"},
@@ -87,6 +107,7 @@ var _ = Describe("rendering", func() {
 	It("lists all attached networks without unqualified names", func() {
 		var buf bytes.Buffer
 		r := &renderer{w: &buf, centerName: "c0", spinner: newSpinner()}
+		r.SetNetworks([]string{"net_A", "net_B"})
 		r.Render([]dig.NamedAddressSet{
 			{FQDN: "foo.net_A."},
 			{FQDN: "bar.net_B."},

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/siemens/mobydig/dig"
 	"github.com/siemens/mobydig/types"
@@ -23,6 +24,9 @@ type renderer struct {
 	centerName  string
 	w           io.Writer
 	spinner     *spinner
+
+	mu       sync.Mutex
+	networks []string // names of the networks attached to the center container.
 }
 
 // newRenderer returns a Render object rendering to the specified io.Writer.
@@ -43,9 +47,20 @@ func (r *renderer) Stop() {
 	r.spinner.Stop()
 }
 
+// SetNetworks sets the names of the networks attached to the center container,
+// so that FQDNs can be grouped by network.
+func (r *renderer) SetNetworks(names []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.networks = slices.Clone(names)
+}
+
 // Render the given named+qualified addresses.
 func (r *renderer) Render(na []dig.NamedAddressSet) {
-	groups := groupNames(na)
+	r.mu.Lock()
+	networks := r.networks
+	r.mu.Unlock()
+	groups := groupNames(networks, na)
 	// If we don't have any name+addressing information yet, show a proxy
 	// message.
 	if len(groups) == 0 {
@@ -67,7 +82,7 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 	_, _ = fmt.Fprintf(r.w, "networks attached to container %s: ", r.centerName)
 	sep := ""
 	for _, group := range groups {
-		gn := groupName(group[0].FQDN)
+		gn := groupName(networks, group[0].FQDN)
 		if gn == "" {
 			continue
 		}
@@ -77,7 +92,7 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 	_, _ = fmt.Fprintln(r.w)
 	// Render the network groups...
 	for _, group := range groups {
-		gn := groupName(group[0].FQDN)
+		gn := groupName(networks, group[0].FQDN)
 		switch gn {
 		case "":
 			_, _ = fmt.Fprint(r.w, "DNS names for containers/services on any attached network\n")
@@ -93,6 +108,9 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 // renderGroupDetails renders a network group's labels and qualified addresses.
 func (r *renderer) renderGroupDetails(labelwidth int, na dig.NamedAddressSet) {
 	_, _ = fmt.Fprintf(r.w, "%-*s%-*s", r.Indentation, "", labelwidth, strings.TrimSuffix(na.FQDN, "."))
+	if len(na.Addresses) == 0 && na.Error != "" {
+		_, _ = fmt.Fprint(r.w, invalidAddressStyle.Styled(" × unresolvable "))
+	}
 	for idx, addr := range na.Addresses {
 		if idx > 0 {
 			_, _ = fmt.Fprint(r.w, " ")
@@ -126,43 +144,48 @@ func sortQualifiedAddresses(addrs []types.QualifiedAddressValue) {
 // grouped labels. That is, sorting order is not lexicographically on the FQDNs,
 // but instead first according to network labels (if not present, then assumed
 // to be ""), and second according to the service/container labels.
-func sortFQDNs(addrs []dig.NamedAddressSet) {
+func sortFQDNs(networks []string, addrs []dig.NamedAddressSet) {
 	sort.Slice(addrs, func(a, b int) bool {
-		gA, lA := groupAndLabel(addrs[a].FQDN)
-		gB, lB := groupAndLabel(addrs[b].FQDN)
+		gA, lA := groupAndLabel(networks, addrs[a].FQDN)
+		gB, lB := groupAndLabel(networks, addrs[b].FQDN)
 		return (gA < gB) || ((gA == gB) && (lA < lB))
 	})
 }
 
-// groupAndLabel returns the group label and the container/service label
-// separately, given an FQDN. If the FQDN consists of only a single label, then
-// this is taken to refer to a container/service label and the group label is
-// assumed to be "".
-func groupAndLabel(fqdn string) (group string, label string) {
-	f := strings.Split(strings.TrimSuffix(fqdn, "."), ".")
-	if len(f) > 1 {
-		return f[1], f[0]
+// groupAndLabel returns the network name and the container/service label
+// separately, given an FQDN and the names of the attached networks. As both
+// network and container names might contain dots, the FQDN is matched against
+// the network names, preferring the longest match. If the FQDN doesn't end in
+// any network name, then it is taken to be a container/service label and the
+// network name is assumed to be "".
+func groupAndLabel(networks []string, fqdn string) (group string, label string) {
+	name := strings.TrimSuffix(fqdn, ".")
+	label = name
+	for _, network := range networks {
+		if l, ok := strings.CutSuffix(name, "."+network); ok && l != "" && len(network) > len(group) {
+			group, label = network, l
+		}
 	}
-	return "", f[0]
+	return group, label
 }
 
-// groupName returns the group label of an FQDN, or "" if the FQDN consists of a
-// single label only.
-func groupName(fqdn string) string {
-	group, _ := groupAndLabel(fqdn)
+// groupName returns the network name of an FQDN, or "" if the FQDN doesn't end
+// in any of the specified network names.
+func groupName(networks []string, fqdn string) string {
+	group, _ := groupAndLabel(networks, fqdn)
 	return group
 }
 
 // Note: groupNames modifies the passed addrs in place.
-func groupNames(addrs []dig.NamedAddressSet) [][]dig.NamedAddressSet {
-	sortFQDNs(addrs)
+func groupNames(networks []string, addrs []dig.NamedAddressSet) [][]dig.NamedAddressSet {
+	sortFQDNs(networks, addrs)
 	groups := [][]dig.NamedAddressSet{}
 	var recentGroup []dig.NamedAddressSet
 	for _, addr := range addrs {
-		gn := groupName(addr.FQDN)
+		gn := groupName(networks, addr.FQDN)
 		// if this is the first group ever or we have wandered off into a new
 		// group, then allocate a new group.
-		if recentGroup == nil || gn != groupName(recentGroup[0].FQDN) {
+		if recentGroup == nil || gn != groupName(networks, recentGroup[0].FQDN) {
 			if recentGroup != nil {
 				groups = append(groups, recentGroup)
 			}
@@ -175,7 +198,7 @@ func groupNames(addrs []dig.NamedAddressSet) [][]dig.NamedAddressSet {
 		groups = append(groups, recentGroup)
 	}
 	for _, group := range groups {
-		sortFQDNs(group)
+		sortFQDNs(networks, group)
 	}
 	return groups
 }
