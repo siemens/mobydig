@@ -11,21 +11,23 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/siemens/mobydig/dnsworker"
-	"github.com/siemens/mobydig/types"
-
 	"github.com/miekg/dns"
 	"github.com/thediveo/lxkns/containerizer/whalefriend"
 	"github.com/thediveo/lxkns/discover"
 	"github.com/thediveo/lxkns/model"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/lxkns/species"
+	"github.com/thediveo/nonstd/sets"
 	"github.com/thediveo/whalewatcher/v2/watcher"
 	"github.com/thediveo/whalewatcher/v2/watcher/moby"
+
+	"github.com/siemens/mobydig/dnsworker"
+	"github.com/siemens/mobydig/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/namspill"
 	. "github.com/thediveo/success"
 )
@@ -59,6 +61,7 @@ var _ = Describe("pinger", Ordered, func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			// Newer implementations of Go's std IP address resolution got
 			// progressively more complex, doing more stuff in the background
@@ -67,13 +70,15 @@ var _ = Describe("pinger", Ordered, func() {
 			// functions to wind down.
 			Eventually(Goroutines).WithTimeout(10 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 			Expect(Tasks()).To(BeUniformlyNamespaced())
 		})
 	})
 
 	It("handles multiple stops", func() {
 		pinger, _ := New(1)
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			By(fmt.Sprintf("%d round", i+1))
 			done := make(chan struct{})
 			go func() {
@@ -105,7 +110,7 @@ var _ = Describe("pinger", Ordered, func() {
 
 	It("cancels address culture", NodeTimeout(30*time.Second), func(ctx context.Context) {
 		netnspath := testcntr.Process.Namespaces[model.NetNS].Ref()[0]
-		pinger, courtTV := new(1, 0,
+		pinger, courtTV := newPinger(1, 0,
 			InNetworkNamespace(netnspath),
 			WithCount(1),
 			WithInterval(500*time.Millisecond),
@@ -145,7 +150,7 @@ var _ = Describe("pinger", Ordered, func() {
 		pinger, courtTV := New(3)
 		inch := make(chan types.QualifiedAddress)
 		go func() {
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				inch <- &types.NamedAddressValue{
 					FQDN:                  strconv.Itoa(i),
 					QualifiedAddressValue: types.QualifiedAddressValue{Address: "localhost"},
@@ -157,11 +162,11 @@ var _ = Describe("pinger", Ordered, func() {
 			pinger.ValidateStream(inch)
 			pinger.StopWait()
 		}()
-		i := map[string]struct{}{}
+		i := sets.New[string]()
 		for qa := range courtTV {
-			na := qa.(types.NamedAddress).NA()
+			na := AssignableTo[types.NamedAddress](qa).NA()
 			if !na.Quality.IsPending() {
-				i[na.FQDN] = struct{}{}
+				i.Add(na.FQDN)
 			}
 		}
 		Expect(i).To(HaveLen(5))
@@ -180,8 +185,7 @@ var _ = Describe("pinger", Ordered, func() {
 			var addr string
 			// We don't rely on the DnsPool workers to correctly switch network
 			// namespaces, so we do it ourselves here... ;)
-			Expect(ops.Execute(func() interface{} {
-				defer GinkgoRecover()
+			Expect(ops.Visit(func() {
 				By("resolving a container's name from inside another container")
 
 				dnsclnt := dns.Client{}
@@ -201,10 +205,9 @@ var _ = Describe("pinger", Ordered, func() {
 				addrs := <-ch
 				if len(addrs) == 0 {
 					addr = name // expected case; use the non-existing DNS name instead of an IP literal
-					return nil
+					return
 				}
 				addr = addrs[0]
-				return nil
 			}, testnetnsref)).To(Succeed())
 			By(fmt.Sprintf("pinging %v", addr))
 			pinger.Validate(ctx, addr)
@@ -215,11 +218,10 @@ var _ = Describe("pinger", Ordered, func() {
 					Quality: types.Verifying,
 				}))))
 			By("waiting for final invalidation verdict")
-			Eventually(courtTV).WithTimeout(10*time.Second).Should(Receive(
-				HaveValue(Equal(types.QualifiedAddressValue{
-					Address: addr,
-					Quality: verdict,
-				}))), "waited for the train that never came: address should be %s", verdict)
+			Eventually(courtTV).WithTimeout(10*time.Second).Should(Receive(SatisfyAll(
+				HaveField("Address", addr),
+				HaveField("Quality", verdict),
+			)), "waited for the train that never came: address should be %s", verdict)
 			pinger.StopWait()
 			Eventually(courtTV).Should(BeClosed())
 		},

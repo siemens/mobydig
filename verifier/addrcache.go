@@ -6,6 +6,7 @@ package verifier
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/siemens/mobydig/types"
@@ -35,14 +36,32 @@ type qualityUpdateConsumers struct {
 }
 
 // Update checks the specified named address to see if it is a new (unverified)
-// address which hasn't yet cached. In this case it returns true to signal a new
-// address to the caller, so that the caller, for instance, can start validating
-// the new address. Update returns false if the (unverified) address has already
-// be seen, and the name for this address is cached. If the address is already
+// address which hasn't been cached yet. In this case it returns true to signal
+// a new address to the caller, so that the caller, for instance, can start
+// validating the new address. Update returns false if the (unverified) address
+// has already been seen, and the name for this address is cached. If the address is already
 // in the cache and its quality is a final verdict of Verified or Invalid, then
 // this update is automatically sent to the news consumer for all FQDNs
 // associated with this address.
+//
+// Notifications are sent without holding the cache lock, so they might get
+// reordered between concurrent Update callers; consumers thus must only ever
+// raise qualities, but never lower them.
 func (c *NamedAddressCache) Update(ctx context.Context, namaddr types.NamedAddress, news chan<- types.NamedAddress) bool {
+	isNew, notifications := c.update(namaddr)
+	for _, notification := range notifications {
+		select {
+		case news <- notification:
+		case <-ctx.Done(): // bail out immediately.
+			return isNew
+		}
+	}
+	return isNew
+}
+
+// update the cache with the specified named address, returning whether the
+// address is new, as well as the notifications to send.
+func (c *NamedAddressCache) update(namaddr types.NamedAddress) (bool, []types.NamedAddress) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	addr := namaddr.Addr()
@@ -58,38 +77,29 @@ func (c *NamedAddressCache) Update(ctx context.Context, namaddr types.NamedAddre
 			q:         namaddr.Qual(),
 			consumers: []string{namaddr.Name()},
 		}
-		select {
-		case news <- namaddr:
-		case <-ctx.Done():
-		}
-		return true
+		return true, []types.NamedAddress{namaddr}
 	}
 	// So, this address is already known. Now, if this is NOT a quality update
 	// by any of the registered consumers for this address, then we're done.
 	// Otherwise, update the quality information.
-	knownConsumer := false
 	fqdn := namaddr.Name()
-	for _, consumer := range qc.consumers {
-		if consumer == fqdn {
-			knownConsumer = true
-		}
-	}
+	knownConsumer := slices.Contains(qc.consumers, fqdn)
 	if namaddr.Qual() <= qc.q {
 		// send an update with the most recent quality known, as the state
 		// specified in the Update is already stale. We only need to inform
 		// about this specific FQDN, no other consumers affected.
-		if !knownConsumer {
-			qc.consumers = append(qc.consumers, fqdn)
-			c.m[addr] = qc
-			select {
-			case news <- namaddr.WithNewQuality(qc.q, qc.err).(types.NamedAddress):
-			case <-ctx.Done():
-			}
+		if knownConsumer {
+			return false, nil
 		}
-		return false
+		qc.consumers = append(qc.consumers, fqdn)
+		c.m[addr] = qc
+		return false, []types.NamedAddress{
+			namaddr.WithNewQuality(qc.q, qc.err).(types.NamedAddress),
+		}
 	}
 	// update quality
 	qc.q = namaddr.Qual()
+	qc.err = namaddr.Err()
 	// This address is already known, so now check if it is in validation or
 	// not. If in validation, then register the current FQDN as a consumer for a
 	// later quality update (if not already registered). If already
@@ -100,7 +110,7 @@ func (c *NamedAddressCache) Update(ctx context.Context, namaddr types.NamedAddre
 		if !knownConsumer {
 			qc.consumers = append(qc.consumers, fqdn)
 		}
-		consumers = qc.consumers
+		consumers = slices.Clone(qc.consumers)
 	default:
 		// As we've reached one of the terminal qualities, notify all registered
 		// consumers and then clear the registration list: all further Update
@@ -112,15 +122,11 @@ func (c *NamedAddressCache) Update(ctx context.Context, namaddr types.NamedAddre
 	c.m[addr] = qc // update cache with most recent quality and consumers.
 	// notify all registered consumers of this quality update.
 	templ := namaddr.NA()
-	templ.Quality = namaddr.Qual()
+	notifications := make([]types.NamedAddress, 0, len(consumers))
 	for _, consumer := range consumers {
-		templ := templ
-		templ.FQDN = consumer
-		select {
-		case news <- &templ:
-		case <-ctx.Done(): // bail out immediately.
-			return false
-		}
+		na := templ
+		na.FQDN = consumer
+		notifications = append(notifications, &na)
 	}
-	return false
+	return false, notifications
 }

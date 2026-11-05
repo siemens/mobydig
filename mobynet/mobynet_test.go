@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/success"
 )
 
@@ -20,20 +21,20 @@ var _ = Describe("Docker networks", func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			// cancelling a dig can take some time for all associated goroutines
 			// to finally terminate...
 			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 		})
 	})
 
 	It("discovers attached networks with their containers", NodeTimeout(30*time.Second), func(ctx context.Context) {
-		cln := Successful(client.NewClientWithOpts(
-			client.WithHost("unix:///var/run/docker.sock"),
-			client.WithAPIVersionNegotiation(),
-		))
-		defer cln.Close()
+		cln := Successful(client.New(client.FromEnv))
+		defer func() { _ = cln.Close() }()
 		dnets, _ := Successful2R(DiscoverAttachedNames(ctx, cln, "test-test-1"))
 		Expect(dnets).To(ContainElements(
 			And(

@@ -4,6 +4,8 @@
 
 package dig
 
+import "github.com/thediveo/nonstd/sets"
+
 // DockerNetwork describes a single Docker network in terms of its name, as well
 // as the DNS labels of the attached containers and associated service names.
 type DockerNetwork struct {
@@ -19,15 +21,12 @@ type DockerNetwork struct {
 // might be mobynet.DiscoverAttachedNames.
 func AllFQDNsOnAttachedNetworks(nets []DockerNetwork) []string {
 	names := []string{}
-	flatnames := map[string]struct{}{}
+	flatnames := sets.New[string]()
 	for _, net := range nets {
 		for _, label := range net.Labels {
 			names = append(names, label+"."+net.Label)
-			flatnames[label] = struct{}{}
+			flatnames.Add(label)
 		}
 	}
-	for flatname := range flatnames {
-		names = append(names, flatname)
-	}
-	return names
+	return append(names, flatnames.Elements()...)
 }

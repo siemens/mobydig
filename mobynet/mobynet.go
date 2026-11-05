@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"strings"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/thediveo/nonstd/sets"
 
 	"github.com/siemens/mobydig/dig"
 )
@@ -32,8 +34,11 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 		return nil, "", err
 	}
 
-	if containerDetails.Container.State.Pid == 0 {
+	if containerDetails.Container.State == nil || containerDetails.Container.State.Pid == 0 {
 		return nil, "", fmt.Errorf("container '%s' is not running", centerID)
+	}
+	if containerDetails.Container.NetworkSettings == nil {
+		return nil, "", fmt.Errorf("container '%s' lacks network settings", centerID)
 	}
 
 	containerDetails.Container.Name = strings.TrimPrefix(containerDetails.Container.Name, "/") // argh, Docker's "/name" legacy!
@@ -48,6 +53,9 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 	// reachable from container 0.
 	mobyNetworks := make([]dig.DockerNetwork, 0, len(containerDetails.Container.NetworkSettings.Networks))
 	for attachedNetName, attachedNet := range containerDetails.Container.NetworkSettings.Networks {
+		if attachedNet == nil {
+			continue
+		}
 		// Inspecting an attached network gives us all the (other) containers
 		// directly attached to that attached network (including container 0).
 		attNetDetails, err := moby.NetworkInspect(ctx, attachedNet.NetworkID, client.NetworkInspectOptions{})
@@ -61,7 +69,7 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 		// refer to multiple containers, we cannot use a simple slice, but
 		// instead need to ensure that each DNS label will appear only once in
 		// the final list. And nobody expects ... Captn Map!
-		namesOnNetwork := map[string]struct{}{}
+		namesOnNetwork := sets.New[string]()
 		// Now inspect the containers attached to this network attached to
 		// container 0. These additional inspections become necessary, as the
 		// attached network inspection doesn't reveal the container aliases, but
@@ -79,25 +87,29 @@ func DiscoverAttachedNames(ctx context.Context, moby *client.Client, centerID st
 			if !ok {
 				details, err := moby.ContainerInspect(ctx, attachedContainer.Name, client.ContainerInspectOptions{})
 				if err != nil {
-					continue
+					if cerrdefs.IsNotFound(err) {
+						continue // container vanished in the meantime.
+					}
+					return nil, "", err
 				}
 				attachedContainerDetails = details.Container
 				containerDetailsCache[attachedContainer.Name] = attachedContainerDetails
 			}
-			namesOnNetwork[attachedContainer.Name] = struct{}{}
-			for _, alias := range attachedContainerDetails.NetworkSettings.Networks[attachedNetName].Aliases {
-				namesOnNetwork[alias] = struct{}{}
+			namesOnNetwork.Add(attachedContainer.Name)
+			if attachedContainerDetails.NetworkSettings == nil {
+				continue
+			}
+			if endpoint := attachedContainerDetails.NetworkSettings.Networks[attachedNetName]; endpoint != nil {
+				for _, alias := range endpoint.Aliases {
+					namesOnNetwork.Add(alias)
+				}
 			}
 		}
 		// Add the DNS label-related information about this Docker network to
 		// the result.
-		dnsLabels := make([]string, 0, len(namesOnNetwork))
-		for alias := range namesOnNetwork {
-			dnsLabels = append(dnsLabels, alias)
-		}
 		mobyNetworks = append(mobyNetworks, dig.DockerNetwork{
 			Label:  attachedNetName,
-			Labels: dnsLabels,
+			Labels: namesOnNetwork.Elements(),
 		})
 	}
 	return mobyNetworks, netnsref, nil

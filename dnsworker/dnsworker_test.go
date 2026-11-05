@@ -6,6 +6,7 @@ package dnsworker
 
 import (
 	"context"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/namspill"
 	. "github.com/thediveo/success"
 )
@@ -28,11 +30,38 @@ var _ = Describe("DNS client connection pool", func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 			Expect(Tasks()).To(BeUniformlyNamespaced())
 		})
+	})
+
+	It("rejects an empty pool", func(ctx context.Context) {
+		Expect(New(ctx, 0, &dns.Client{}, "127.0.0.1:53")).Error().To(HaveOccurred())
+	})
+
+	It("stays in the caller's network namespace for an empty reference", func(ctx context.Context) {
+		pool := Successful(New(ctx, 1, &dns.Client{}, "127.0.0.1:53", InNetworkNamespace("")))
+		DeferCleanup(pool.StopWait)
+		Expect(pool.netns).To(BeNil())
+	})
+
+	It("replaces broken connections", func(ctx context.Context) {
+		pool := Successful(New(ctx, 1, &dns.Client{}, "127.0.0.1:53"))
+		var broken, renewed net.Conn
+		var err error
+		pool.Submit(func(conn *dns.Conn) {
+			broken = conn.Conn
+			err = pool.reconnect(conn)
+			renewed = conn.Conn
+		})
+		pool.StopWait()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(renewed).NotTo(BeIdenticalTo(broken))
 	})
 
 	It("runs a goroutine-limited set of DNS tasks", NodeTimeout(30*time.Second), func(ctx context.Context) {
@@ -54,7 +83,7 @@ var _ = Describe("DNS client connection pool", func() {
 		}
 
 		numtasks := poolsize * 2
-		for i := 0; i < numtasks; i++ {
+		for range numtasks {
 			pool.Submit(taskfn)
 		}
 
@@ -125,11 +154,10 @@ var _ = Describe("DNS client connection pool", func() {
 		Expect(testcntr).NotTo(BeNil(), "missing test-test-1 container")
 
 		dnsclnt := dns.Client{Net: "udp"}
-		pool, err := New(context.Background(),
+		pool := Successful(New(context.Background(),
 			1,
 			&dnsclnt, "127.0.0.11:53",
-			InNetworkNamespace(testcntr.Process.Namespaces[model.NetNS].Ref()[0]))
-		Expect(err).NotTo(HaveOccurred())
+			InNetworkNamespace(testcntr.Process.Namespaces[model.NetNS].Ref()[0])))
 		defer pool.StopWait()
 
 		ch := make(chan struct{})

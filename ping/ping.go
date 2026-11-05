@@ -7,17 +7,16 @@ package ping
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
-
-	"github.com/siemens/mobydig/types"
 
 	"github.com/gammazero/workerpool"
 	ping "github.com/prometheus-community/pro-bing"
 	"github.com/thediveo/lxkns/ops"
 	"github.com/thediveo/lxkns/ops/relations"
 	"github.com/thediveo/lxkns/species"
+
+	"github.com/siemens/mobydig/types"
 )
 
 // Pinger validates IP addresses by pinging them and then streaming the final
@@ -57,12 +56,12 @@ type PingerOption func(*Pinger)
 // filesystem path that must reference a network namespace (such as
 // "/proc/666/ns/net").
 func New(size int, options ...PingerOption) (*Pinger, <-chan types.QualifiedAddress) {
-	return new(size, size, options...)
+	return newPinger(size, size, options...)
 }
 
-// new returns a new [Pinger] with a maximum worker pool of the specified size and
-// a “verdict stream” with the specified buffer size.
-func new(workersize int, chansize int, options ...PingerOption) (*Pinger, <-chan types.QualifiedAddress) {
+// newPinger returns a new [Pinger] with a maximum worker pool of the specified
+// size and a “verdict stream” with the specified buffer size.
+func newPinger(workersize int, chansize int, options ...PingerOption) (*Pinger, <-chan types.QualifiedAddress) {
 	courtTV := make(chan types.QualifiedAddress, chansize)
 	pinger := &Pinger{
 		count:               3,
@@ -78,17 +77,23 @@ func new(workersize int, chansize int, options ...PingerOption) (*Pinger, <-chan
 }
 
 // InNetworkNamespace optionally runs a [Pinger] inside the network namespace
-// referenced by the specified filesystem path.
+// referenced by the specified filesystem path. An empty path leaves the Pinger
+// in the network namespace of the caller.
 func InNetworkNamespace(netnsref string) PingerOption {
 	return func(p *Pinger) {
+		if netnsref == "" {
+			p.netns = nil
+			return
+		}
 		p.netns = ops.NewTypedNamespacePath(netnsref, species.CLONE_NEWNET)
 	}
 }
 
 // WithCount sets the number of pings for testing reachability of an IP address.
+// A count of zero is treated as one, as pinging never stops otherwise.
 func WithCount(count uint) PingerOption {
 	return func(p *Pinger) {
-		p.count = int(count)
+		p.count = max(int(count), 1)
 	}
 }
 
@@ -99,7 +104,7 @@ func WithInterval(interval time.Duration) PingerOption {
 	}
 }
 
-// Unprivileged tells the Pinger to carry out unprivileged pings using UDP
+// AsUnprivileged tells the Pinger to carry out unprivileged pings using UDP
 // instead of ICMP packet.
 func AsUnprivileged() PingerOption {
 	return func(p *Pinger) {
@@ -109,14 +114,10 @@ func AsUnprivileged() PingerOption {
 
 // WithThresholdPercentage takes a percentage between 0 and 100 that specifies
 // the percentage of successful ping responses required in order to validate the
-// pinged IP address.
+// pinged IP address. Percentages above 100 are capped to 100.
 func WithThresholdPercentage(threshold uint) PingerOption {
-	if threshold > 100 {
-		panic(fmt.Errorf("Pinger: threshold must be a percentage between 0 <= threshold <= 100, got: %d",
-			threshold))
-	}
 	return func(p *Pinger) {
-		p.thresholdPercentage = threshold
+		p.thresholdPercentage = min(threshold, 100)
 	}
 }
 
@@ -224,7 +225,7 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 	// Allow cancelling a blocked address verdict send to avoid leaking
 	// goroutines. The downside is that since the order in which select checks
 	// for ctx.Done() and a blocked verdict channel is random, so we cannot
-	// guarantuee that either never a verdict is sent or the verdict gets always
+	// guarantee that either never a verdict is sent or the verdict gets always
 	// sent.
 	select {
 	case p.courtTV <- verdict: // not yet the final one ;)
@@ -242,7 +243,7 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 				return
 			}
 		}()
-		ping := func() interface{} {
+		run := func() error {
 			// A quick and non-blocking check to see if the context has been
 			// cancelled before we start our work...
 			select {
@@ -268,8 +269,7 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			stats := pinger.Statistics()
-			if stats.PacketsRecv < pinger.Count*int(p.thresholdPercentage)/100 {
+			if !enoughReplies(pinger.Statistics().PacketsRecv, pinger.Count, p.thresholdPercentage) {
 				return errors.New("no replies or too many losses")
 			}
 			verdict = verdict.WithNewQuality(types.Verified, nil)
@@ -278,22 +278,15 @@ func (p *Pinger) validate(ctx context.Context, verdict types.QualifiedAddress) {
 		// Run the ping in the requested network namespace, if necessary.
 		var err error
 		if p.netns != nil {
-			// lxkns' ops.Execute differentiates between a namespace switching
-			// error and the under switched namespaces called function result.
-			// We use this function result to return ping errors, so we now need
-			// to use the ping-related error (unless there is an Execute-related
-			// error) to trigger the final invalid verdict.
-			var pingerr interface{}
-			pingerr, err = ops.Execute(ping, p.netns)
-			if err == nil && pingerr != nil {
-				if fnerr, ok := pingerr.(error); ok {
-					err = fnerr
-				}
+			// ops.Execute differentiates between a namespace switching error and
+			// the ping error returned by run; either triggers an invalid verdict.
+			var pingerr error
+			pingerr, err = ops.Execute(run, p.netns)
+			if err == nil {
+				err = pingerr
 			}
 		} else {
-			if res := ping(); res != nil {
-				err = res.(error)
-			}
+			err = run()
 		}
 		if err != nil {
 			verdict = verdict.WithNewQuality(verdict.QA().Quality, err)
@@ -310,4 +303,10 @@ func (p *Pinger) StopWait() {
 		p.workers.StopWait()
 		close(p.courtTV)
 	})
+}
+
+// enoughReplies returns true if the received replies reach the threshold
+// percentage of the sent pings, avoiding integer truncation.
+func enoughReplies(received, sent int, thresholdPercentage uint) bool {
+	return received*100 >= sent*int(thresholdPercentage)
 }

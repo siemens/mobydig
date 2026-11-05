@@ -20,14 +20,12 @@ import (
 // container or network elements.
 const MessyMobyLabel = "messymoby"
 
-// NewClient returns a new Docker client connected to the default socket API
-// location on the local host.
+// NewClient returns a new Docker client connected to the Docker daemon
+// specified by the environment, defaulting to the local host's socket API.
 func NewClient() *client.Client {
 	gi.GinkgoHelper()
 
-	return s.Successful(client.New(
-		client.WithHost("unix:///var/run/docker.sock"),
-	))
+	return s.Successful(client.New(client.FromEnv))
 }
 
 // DockerCompose executes docker-compose with the specified CLI arguments,
@@ -41,10 +39,16 @@ func DockerCompose(ctx context.Context, args ...string) {
 	g.Eventually(sess).WithContext(ctx).Should(gx.Exit(0))
 }
 
-// Cleanup removes dead test containers as well as duplicate networks.
+// Cleanup removes dead test containers as well as duplicate networks, failing
+// the current spec or setup node on errors other than already vanished
+// containers or networks.
 func Cleanup(ctx context.Context) {
+	gi.GinkgoHelper()
+
 	cln := NewClient()
 	defer func() { _ = cln.Close() }()
-	_ = RemoveDeadTestContainers(ctx, cln, MessyMobyLabel)
-	_ = RemoveDuplicateTestNetworks(ctx, cln, MessyMobyLabel)
+	g.Expect(RemoveDeadTestContainers(ctx, cln, MessyMobyLabel)).To(g.Succeed(),
+		"cannot remove dead test containers")
+	g.Expect(RemoveDuplicateTestNetworks(ctx, cln, MessyMobyLabel)).To(g.Succeed(),
+		"cannot remove duplicate test networks")
 }

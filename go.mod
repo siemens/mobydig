@@ -3,8 +3,8 @@ module github.com/siemens/mobydig
 go 1.26.6
 
 require (
+	github.com/containerd/errdefs v1.0.0
 	github.com/gammazero/workerpool v1.3.0
-	github.com/gosuri/uilive v0.0.4
 	github.com/miekg/dns v1.1.73
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
@@ -12,11 +12,16 @@ require (
 	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/prometheus-community/pro-bing v0.9.1
+	github.com/rivo/uniseg v0.4.7
 	github.com/spf13/cobra v1.10.2
+	github.com/thediveo/fdooze v0.3.4
 	github.com/thediveo/lxkns v0.48.0
 	github.com/thediveo/namspill v0.1.9
+	github.com/thediveo/nonstd v0.22.0
+	github.com/thediveo/safe v0.9.1
 	github.com/thediveo/success v1.4.0
 	github.com/thediveo/whalewatcher/v2 v2.1.1
+	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -30,7 +35,6 @@ require (
 	github.com/containerd/containerd/api v1.12.0 // indirect
 	github.com/containerd/containerd/v2 v2.4.0 // indirect
 	github.com/containerd/continuity v0.5.0 // indirect
-	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.2.0 // indirect
@@ -64,7 +68,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/thediveo/cpus v0.11.1 // indirect
@@ -72,7 +75,6 @@ require (
 	github.com/thediveo/go-mntinfo v1.0.5 // indirect
 	github.com/thediveo/go-plugger/v3 v3.2.2 // indirect
 	github.com/thediveo/ioctl v0.9.5 // indirect
-	github.com/thediveo/nonstd v0.22.0 // indirect
 	github.com/thediveo/procfsroot v1.1.0 // indirect
 	github.com/thediveo/testily v0.11.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -85,7 +87,6 @@ require (
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect

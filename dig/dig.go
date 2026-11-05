@@ -7,16 +7,16 @@ package dig
 import (
 	"context"
 
+	"github.com/miekg/dns"
+
 	"github.com/siemens/mobydig/dnsworker"
 	"github.com/siemens/mobydig/types"
-
-	"github.com/miekg/dns"
 )
 
 // Digger digs the IPv4 and IPv6 addresses of FQDNs and then streams its
 // findings over its “news” channel.
 //
-// By connecting the news (output) channel of a Verifier to the input channel of
+// By connecting the news (output) channel of a Digger to the input channel of
 // a Verifier the reachability of the addresses dug can automatically be
 // verified by pinging them.
 type Digger struct {
@@ -26,8 +26,11 @@ type Digger struct {
 
 // New returns a new Digger with a maximum worker pool of the specified size as
 // well as a “news stream”. This news channel sends NamedAddress elements as
-// they are submitted for diggung, as well as the outcome(s) of the digs. Please
-// note that the returned results channel is never closed by a Digger itself.
+// they are submitted for digging, as well as the outcome(s) of the digs. The
+// news channel gets closed by [Digger.StopWait].
+//
+// If netnsref is empty, then digging takes place in the network namespace of
+// the caller.
 //
 // I dunno what Sir Tim, Mick, Phil, and all the others might think of our
 // digging here...
@@ -60,13 +63,14 @@ func (d *Digger) DigNetworks(ctx context.Context, nets []DockerNetwork) {
 
 // DigFQDNs digs the given list of “host names” (whatever “host names” actually
 // might mean). Intermediate and final results are getting sent to the channel
-// returned beforehand by New.
+// returned beforehand by New. Names that cannot be resolved are reported
+// without an address, but with Invalid quality and the resolution error.
 func (d *Digger) DigFQDNs(ctx context.Context, names []string) {
 	// Initially sent all unverified FQDNs to get the ball rolling so that the
 	// consumer knows which FQDNs are going to be dug up next. Also submit the
 	// DNS worker jobs to resolve the FQDNs...
 	for _, name := range names {
-		name := dns.Fqdn(name) // TODO: search list???
+		name := dns.Fqdn(name)
 		// Initially inform the consumer of any FQDN that will undergo
 		// resolution later; please note that ResolveName will enqueue
 		// resolutions and thus not block. We only block if the consumer doesn't
@@ -79,8 +83,16 @@ func (d *Digger) DigFQDNs(ctx context.Context, names []string) {
 			return
 		}
 		d.workers.ResolveName(ctx, name, func(addrs []string, err error) {
+			if len(addrs) == 0 && err != nil && ctx.Err() == nil {
+				select {
+				case d.news <- (&types.NamedAddressValue{FQDN: name}).
+					WithNewQuality(types.Invalid, err).(types.NamedAddress):
+				case <-ctx.Done():
+				}
+				return
+			}
 			for _, addr := range addrs {
-				// Avoid blocking enless in case of the context getting
+				// Avoid blocking endlessly in case of the context getting
 				// cancelled.
 				select {
 				case d.news <- &types.NamedAddressValue{

@@ -81,6 +81,6 @@ func (qa *QualifiedAddressValue) WithNewQuality(q Quality, err error) QualifiedA
 	return &QualifiedAddressValue{
 		Address: qa.Address,
 		Quality: q,
-		err:     qa.err,
+		err:     err,
 	}
 }

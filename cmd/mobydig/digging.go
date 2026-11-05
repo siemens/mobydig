@@ -7,12 +7,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
-	"github.com/gosuri/uilive"
 	"github.com/moby/moby/client"
+	"github.com/thediveo/nonstd/xslices"
 
 	"github.com/siemens/mobydig/dig"
+	"github.com/siemens/mobydig/internal/livewriter"
 	"github.com/siemens/mobydig/mobynet"
 	"github.com/siemens/mobydig/verifier"
 )
@@ -21,14 +23,13 @@ import (
 // for networks attached to it. Next, container and service names on these
 // networks are discovered, and then these (DNS) names dug up from the
 // perspective of the center container. Finally, the addresses are verified by
-// pinging them for good or bad.
-func DigAndReport(ctx context.Context, startpointName string) error {
-	cln, err := client.New(
-		client.WithHost("unix:///var/run/docker.sock"),
-	)
+// pinging them for good or bad. The progress gets continuously rendered to out.
+func DigAndReport(ctx context.Context, out io.Writer, startpointName string) error {
+	cln, err := client.New(client.FromEnv)
 	if err != nil {
 		return fmt.Errorf("cannot connect to the Docker daemon: %w", err)
 	}
+	defer func() { _ = cln.Close() }()
 
 	// Create an empty (concurrency-safe) result map with named-and-qualified
 	// addresses and immediately fire off the rendering goroutine. The rendering
@@ -39,15 +40,10 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 	trackingDone := make(chan struct{})
 	renderingDone := make(chan struct{})
 
+	term := livewriter.New(out)
+	renderer := newRenderer(term, startpointName)
+	renderer.Indentation = int(*indentation)
 	go func() {
-		// Dunno what uilive's background updating mode using Start() is good
-		// for? It may trigger anytime with the rendering into the buffer not
-		// yet complete, thus making the terminal output very flickery. So we
-		// avoid Start() and instead trigger an explicit flush to the terminal
-		// after having completed the rendering.
-		term := uilive.New()
-		renderer := newRenderer(term, startpointName)
-		renderer.Indentation = int(*indentation)
 		defer func() {
 			renderData(term, renderer, namaddrs)
 			renderer.Stop()
@@ -64,11 +60,17 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 			}
 		}
 	}()
+	stopRendering := func() {
+		close(trackingDone)
+		<-renderingDone
+	}
 
 	attachedNets, netnsref, err := mobynet.DiscoverAttachedNames(ctx, cln, startpointName)
 	if err != nil {
+		stopRendering()
 		return fmt.Errorf("cannot discover attached networks and their containers: %w", err)
 	}
+	renderer.SetNetworks(xslices.Map(attachedNets, func(n dig.DockerNetwork) string { return n.Label }))
 
 	// Now lets put the required processing elements and their plumbing in
 	// place.
@@ -80,12 +82,14 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 	// Rendering is done on the information collected by the NamedAddressMap.
 	digger, diggernews, err := dig.New(int(*workerNumber), netnsref)
 	if err != nil {
+		stopRendering()
 		return fmt.Errorf("cannot dig address information: %w", err)
 	}
-	verifier, news := verifier.New(int(*workerNumber), netnsref)
-	go verifier.Verify(ctx, diggernews)
+	vf, news := verifier.New(int(*workerNumber), netnsref)
+	go vf.Verify(ctx, diggernews)
+	var trackErr error
 	go func() {
-		_ = namaddrs.Track(ctx, news)
+		trackErr = namaddrs.Track(ctx, news)
 		close(trackingDone)
 	}()
 
@@ -94,17 +98,17 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 	// stages. Then close the input stream and wait for all the data to pass the
 	// stages and finally get rendered a last time.
 	go func() {
-		digger.DigNetworks(context.Background(), attachedNets)
+		digger.DigNetworks(ctx, attachedNets)
 		digger.StopWait()
 	}()
 	<-renderingDone
 
-	return nil
+	return trackErr
 }
 
 // renderData get the current named+verified address data and then renders (and
 // flushes) it to the terminal.
-func renderData(term *uilive.Writer, r *renderer, data *dig.NamedAddressesMap) {
+func renderData(term *livewriter.Writer, r *renderer, data *dig.NamedAddressesMap) {
 	r.Render(data.Get())
-	term.Flush()
+	_ = term.Flush()
 }

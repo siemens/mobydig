@@ -17,11 +17,7 @@
         "ghcr.io/thediveo/devcontainer-features/pinact:0": {},
         "ghcr.io/thediveo/devcontainer-features/go-mod-upgrade:1": {},
         "ghcr.io/thediveo/devcontainer-features/lazygit:0": {},
-        "ghcr.io/thediveo/devcontainer-features/docsify:0": {
-            "port": "3300",
-            "livereload-port": "3301"
-        },
-        "ghcr.io/thediveo/devcontainer-features/goreportcard:0": {},
+        "ghcr.io/thediveo/devcontainer-features/goreportcard:1": {},
         "ghcr.io/devcontainers/features/docker-in-docker:4": {
             "version": "latest",
             "moby": false // go for the upstream Docker-CE
@@ -31,7 +27,9 @@
             "num-programs": "1",    // do never run package-level tests in parallel
             "race": true,           // enable race detector
             "verbose": true,
-            "html": true            // generate coverage.html
+            "html": true,           // generate coverage.html
+            // test helper packages only
+            "uncovered-packages": "github.com/siemens/mobydig/messymoby github.com/siemens/mobydig/test"
         }
     },
     "runArgs": [
@@ -54,8 +52,9 @@
     "postCreateCommand": {
         "go-for-root": "echo 'Defaults:vscode secure_path = \"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin\"' | sudo tee -a /etc/sudoers.d/vscode",
         "no-first-run-notice": "rm -f /workspaces/.codespaces/shared/first-run-notice.txt",
-        "unconfine-apparmor": "echo 0 | sudo tee -a /proc/sys/kernel/apparmor_restrict_unprivileged_userns",
-        "userns-for-all": "echo 1 | sudo tee -a /proc/sys/kernel/unprivileged_userns_clone"
+        // these sysctls only exist on Ubuntu/Debian kernels, but not on, say, WSL2.
+        "unconfine-apparmor": "[ ! -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ] || echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns",
+        "userns-for-all": "[ ! -e /proc/sys/kernel/unprivileged_userns_clone ] || echo 1 | sudo tee /proc/sys/kernel/unprivileged_userns_clone"
     },
     "customizations": {
         "vscode": {
@@ -63,7 +62,8 @@
                 "dnut.rewrap-revived",
                 "brunnerh.insert-unicode",
                 "mhutchie.git-graph",
-                "docker.docker"
+                "docker.docker",
+                "ms-vscode.live-server"
             ]
         }
     }

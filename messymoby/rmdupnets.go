@@ -6,42 +6,42 @@ package messymoby
 
 import (
 	"context"
+	"errors"
 
-	"github.com/moby/moby/api/types/network"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 )
 
-// RemoveDuplicateTestNetworks removes duplicate networks, that is multiple
-// networks with the same name, yet different IDs. Optionally, removal can be
-// limited to networks with a specific label name only.
+// RemoveDuplicateTestNetworks removes all networks carrying the specified label
+// whose names are used by multiple of these labelled networks with different
+// IDs. An empty label name removes nothing. Networks that vanished in the
+// meantime aren't reported as errors.
 func RemoveDuplicateTestNetworks(ctx context.Context, cln *client.Client, labelname string) error {
-	nets, err := cln.NetworkList(ctx, client.NetworkListOptions{})
+	if labelname == "" {
+		return nil
+	}
+	nets, err := cln.NetworkList(ctx, client.NetworkListOptions{
+		Filters: make(client.Filters).Add("label", labelname),
+	})
 	if err != nil {
 		return err
 	}
 	// Build map from network names to network IDs, where the same name might
 	// map to multiple IDs.
-	netnames := map[string][]string{}        // name -> []ID
-	netrscs := map[string]*network.Network{} // ID -> details
-	for idx, net := range nets.Items {
+	netnames := map[string][]string{} // name -> []ID
+	for _, net := range nets.Items {
 		netnames[net.Name] = append(netnames[net.Name], net.ID)
-		netrscs[net.ID] = &nets.Items[idx].Network
 	}
-	// Now remove all networks with duplicate IDs.
-	for netname, netIDs := range netnames {
+	var errs []error
+	for _, netIDs := range netnames {
 		if len(netIDs) == 1 {
 			continue
 		}
-		switch netname {
-		case "bridge", "host", "none":
-			continue
-		}
 		for _, netID := range netIDs {
-			if _, ok := netrscs[netID].Labels[labelname]; ok && labelname != "" {
-				_, _ = cln.NetworkRemove(ctx, netID, client.NetworkRemoveOptions{})
+			if _, err := cln.NetworkRemove(ctx, netID, client.NetworkRemoveOptions{}); err != nil && !cerrdefs.IsNotFound(err) {
+				errs = append(errs, err)
 			}
 		}
 	}
-
-	return nil
+	return errors.Join(errs...)
 }

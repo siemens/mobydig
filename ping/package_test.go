@@ -6,6 +6,7 @@ package ping
 
 import (
 	"context"
+	"log/slog"
 	"runtime"
 	"testing"
 	"time"
@@ -24,6 +25,9 @@ func init() {
 }
 
 var _ = BeforeSuite(NodeTimeout(120*time.Second), func(ctx context.Context) {
+	DeferCleanup(slog.SetDefault, slog.Default())
+	slog.SetDefault(slog.New(slog.NewTextHandler(GinkgoWriter, nil)))
+
 	By("Cleaning up test containers and networks")
 	messymoby.Cleanup(ctx)
 	By("Tearing down any left-over test harness")

@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"github.com/siemens/mobydig/messymoby"
 	"github.com/siemens/mobydig/test"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = BeforeSuite(NodeTimeout(120*time.Second), func(ctx context.Context) {

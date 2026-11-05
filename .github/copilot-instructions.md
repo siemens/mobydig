@@ -20,6 +20,8 @@ For sets, use `sets.Set[T]` from `github.com/thediveo/nonstd/sets` instead of `m
 
 Every package's doc comment (the `/* Package <name> ... */` comment preceding the `package` clause) must live in its own dedicated `doc.go` file containing nothing but that comment and the `package` clause. Do not attach package doc comments to files that also contain other declarations.
 
+For commands (`package main`), the `doc.go` comment must instead use Go's command documentation format: start with the capitalized command name (for example, `/* Mobydig digs ... */`), followed by a usage section and a description of the flags.
+
 ## Code Formatting
 
 When formatting Go code, use the custom formatting tool configured in `gostwire.code-workspace`:
@@ -72,9 +74,13 @@ Never add test code to explicitly remove or kill stale containers, as container 
 
 For temporary directories in Ginkgo specs, do not use `GinkgoT().TempDir()`; instead use the plain stdlib together with `DeferCleanup`, for example `tmpdir := Successful(os.MkdirTemp("", "mobydav-test-"))` followed by `DeferCleanup(os.RemoveAll, tmpdir)`.
 
+When a test buffer might get written concurrently while expectations are checked (such as output rendered by background goroutines), use `safe.Buffer` from `github.com/thediveo/safe` instead of `bytes.Buffer`.
+
 ## End-to-End Tests
 
-End-to-end tests live in the `e2e/` package only and are opt-in: its suite skips itself unless the Ginkgo label filter explicitly selects the `e2e` label. Do not use build tags to gate them. `RunSpecs` already applies the `e2e` label suite-wide; use further labels (such as `k8s` or `tshark`) on specs to allow narrower selections.
+Lightweight end-to-end tests stay in their respective packages and run as part of the normal test runs. These are tests that use the shared docker compose test harness (`test/docker-compose.yaml`), which each package suite brings up in its `BeforeSuite` via `messymoby` and `test`. Specs requiring root must skip themselves when not running as root, for instance using `if os.Getuid() != 0 { Skip("needs root") }`.
+
+Any heavyweight end-to-end tests go into the `e2e/` package only and are opt-in: its suite skips itself unless the Ginkgo label filter explicitly selects the `e2e` label. Do not use build tags to gate them. `RunSpecs` already applies the `e2e` label suite-wide; use further labels (such as `k8s` or `tshark`) on specs to allow narrower selections.
 
 Run them explicitly, keeping the usual constraints:
 

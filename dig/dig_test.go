@@ -10,18 +10,19 @@ import (
 	"os"
 	"time"
 
-	"github.com/siemens/mobydig/types"
-	"github.com/siemens/mobydig/verifier"
-
 	"github.com/thediveo/lxkns/containerizer/whalefriend"
 	"github.com/thediveo/lxkns/discover"
 	"github.com/thediveo/lxkns/model"
 	"github.com/thediveo/whalewatcher/v2/watcher"
 	"github.com/thediveo/whalewatcher/v2/watcher/moby"
 
+	"github.com/siemens/mobydig/types"
+	"github.com/siemens/mobydig/verifier"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gleak"
+	. "github.com/thediveo/fdooze"
 	. "github.com/thediveo/namspill"
 	. "github.com/thediveo/success"
 )
@@ -55,11 +56,14 @@ var _ = Describe("digging in the (address) dirt", Ordered, func() {
 
 	BeforeEach(func() {
 		goodgos := Goroutines()
+		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			// cancelling a dig can take some time for all associated goroutines
 			// to finally terminate...
 			Eventually(Goroutines).Within(3 * time.Second).ProbeEvery(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
+			Eventually(Filedescriptors).Within(3 * time.Second).ProbeEvery(250 * time.Millisecond).
+				ShouldNot(HaveLeakedFds(goodfds))
 			// safeguard to catch incorrect OS-level thread locking and
 			// unlocking across switching network namespaces.
 			Expect(Tasks()).To(BeUniformlyNamespaced())
@@ -153,6 +157,21 @@ var _ = Describe("digging in the (address) dirt", Ordered, func() {
 		Expect(m.m).NotTo(BeEmpty())
 		Expect(m.m).To(HaveEach(HaveEach(HaveField("Quality", Equal(types.Verified)))))
 		Expect(vfdone).Should(BeClosed())
+	})
+
+	It("reports unresolvable names", NodeTimeout(30*time.Second), func(ctx context.Context) {
+		netnsref := testcntr.Process.Namespaces[model.NetNS].Ref()[0]
+		digger, news := Successful2R(New(1, netnsref))
+		go func() {
+			digger.DigFQDNs(ctx, []string{"test-nonexisting-1.net_A"})
+			digger.StopWait()
+		}()
+		Eventually(news).WithContext(ctx).Should(Receive(SatisfyAll(
+			HaveField("FQDN", "test-nonexisting-1.net_A."),
+			HaveField("Quality", types.Invalid),
+			HaveField("Err()", HaveOccurred()),
+		)))
+		Eventually(news).WithContext(ctx).Should(BeClosed())
 	})
 
 	It("cancels digging and verifying", NodeTimeout(30*time.Second), func(ctx context.Context) {

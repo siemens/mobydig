@@ -5,10 +5,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	rtdebug "runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -25,7 +27,7 @@ func newRootCmd() (rootCmd *cobra.Command) {
 	rootCmd = &cobra.Command{
 		Use:     "mobydig [flags] containername",
 		Short:   "mobydig digs and validates DNS names on all networks attached to a specific container",
-		Version: "0.9",
+		Version: version(),
 		Args:    cobra.ExactArgs(1),
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			if *indentation > 80 {
@@ -40,11 +42,15 @@ func newRootCmd() (rootCmd *cobra.Command) {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// from here on, errors aren't about using the command incorrectly.
+			cmd.SilenceUsage = true
 			if *debug {
-				slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})))
+				slog.SetDefault(slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: slog.LevelDebug})))
 				slog.Debug("debug logging enabled")
 			}
-			return DigAndReport(context.Background(), args[0])
+			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
+			return DigAndReport(ctx, cmd.OutOrStdout(), args[0])
 		},
 	}
 	// Sets up the flags.
@@ -57,4 +63,12 @@ func newRootCmd() (rootCmd *cobra.Command) {
 	workerNumber = rootCmd.PersistentFlags().Uint(
 		"workers", 5, "number of DNS and ping workers")
 	return
+}
+
+// version returns the module version mobydig was built from.
+func version() string {
+	if bi, ok := rtdebug.ReadBuildInfo(); ok && bi.Main.Version != "" {
+		return bi.Main.Version
+	}
+	return "(devel)"
 }
