@@ -22,7 +22,7 @@ type Verifier struct {
 
 // New returns a new Verifier that verifies addresses from the perspective of
 // the specified network namespace with a maximum number of parallel
-// verification workers. If the network namespace reference netnsref is zero,
+// verification workers. If the network namespace reference netnsref is empty,
 // then the verification will be carried out in the process' original network
 // namespace.
 func New(size int, netnsref string) (*Verifier, <-chan types.NamedAddress) {
@@ -35,7 +35,7 @@ func New(size int, netnsref string) (*Verifier, <-chan types.NamedAddress) {
 	}, news
 }
 
-// Verify varifies the incoming stream of named addresses until the input
+// Verify verifies the incoming stream of named addresses until the input
 // channel is closed. It then waits for all enqueued verification tasks to
 // complete and then closes the output channel returned by New, and finally
 // returns.
@@ -46,34 +46,35 @@ func New(size int, netnsref string) (*Verifier, <-chan types.NamedAddress) {
 func (v *Verifier) Verify(ctx context.Context, in <-chan types.NamedAddress) {
 	addrcache := NewNamedAddressCache()
 	// As soon as new validation results trickle in, update the cache so that
-	// the cache can inform the consumer of this Validator of the results.
-	done := make(chan struct{}, 1) // fire and forget, and never block.
+	// the cache can inform the consumer of this Verifier of the results.
+	done := make(chan struct{})
 	go func() {
-	slurpTasks:
+		defer close(done)
 		for {
 			select {
 			case qaddr, ok := <-v.checked:
 				if !ok {
-					break slurpTasks
+					return
 				}
-				addrcache.Update(ctx, qaddr.(types.NamedAddress), v.news)
+				if namaddr, ok := qaddr.(types.NamedAddress); ok {
+					addrcache.Update(ctx, namaddr, v.news)
+				}
 			case <-ctx.Done():
-				break slurpTasks
+				return
 			}
 		}
-		close(done)
 	}()
 	// Process incoming named addresses and initiate validation tasks if an
 	// address is seen for the first time. Addresses we've already seen, but for
 	// different FQDNs, will be directly served if their quality has already
 	// been verified. Otherwise, these FQDNs will be put on hold until the
 	// verification result becomes available.
-slurpPingerVerdicts:
+slurpTasks:
 	for {
 		select {
 		case addr, ok := <-in:
 			if !ok {
-				break slurpPingerVerdicts
+				break slurpTasks
 			}
 			if addr.Addr() == "" {
 				// Pass on yet undug addresses directly to the news channel and wait
@@ -81,7 +82,7 @@ slurpPingerVerdicts:
 				select {
 				case v.news <- addr:
 				case <-ctx.Done():
-					break slurpPingerVerdicts
+					break slurpTasks
 				}
 				continue
 			}
@@ -91,17 +92,12 @@ slurpPingerVerdicts:
 				v.pinger.ValidateQA(ctx, addr)
 			}
 		case <-ctx.Done():
-			break slurpPingerVerdicts
+			break slurpTasks
 		}
 	}
 	v.pinger.StopWait()
-	// wait for all verification results to have come through and passed on
-	// before calling it a day. In case the context was cancelled we don't wait
-	// for the done signal, but immediately close our "outlet".
-	select {
-	case <-ctx.Done():
-	default:
-		<-done
-	}
+	// The verdict goroutine might still be sending, so wait for it before
+	// closing our "outlet"; it returns promptly when the context is done.
+	<-done
 	close(v.news)
 }
