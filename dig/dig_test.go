@@ -159,6 +159,21 @@ var _ = Describe("digging in the (address) dirt", Ordered, func() {
 		Expect(vfdone).Should(BeClosed())
 	})
 
+	It("reports unresolvable names", NodeTimeout(30*time.Second), func(ctx context.Context) {
+		netnsref := testcntr.Process.Namespaces[model.NetNS].Ref()[0]
+		digger, news := Successful2R(New(1, netnsref))
+		go func() {
+			digger.DigFQDNs(ctx, []string{"test-nonexisting-1.net_A"})
+			digger.StopWait()
+		}()
+		Eventually(news).WithContext(ctx).Should(Receive(SatisfyAll(
+			HaveField("FQDN", "test-nonexisting-1.net_A."),
+			HaveField("Quality", types.Invalid),
+			HaveField("Err()", HaveOccurred()),
+		)))
+		Eventually(news).WithContext(ctx).Should(BeClosed())
+	})
+
 	It("cancels digging and verifying", NodeTimeout(30*time.Second), func(ctx context.Context) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()

@@ -15,8 +15,9 @@ import (
 // NamedAddressSet is a DNS FQDN together with a list of associated/resolved
 // qualified network addresses.
 type NamedAddressSet struct {
-	FQDN      string                        `json:"fqdn"`      // the DNS "name"
-	Addresses []types.QualifiedAddressValue `json:"addresses"` // associated IP network address(es)
+	FQDN      string                        `json:"fqdn"`            // the DNS "name"
+	Addresses []types.QualifiedAddressValue `json:"addresses"`       // associated IP network address(es)
+	Error     string                        `json:"error,omitempty"` // why the name couldn't be resolved, if so
 }
 
 // NamedAddressesMap maps DNS FQDNs to their corresponding lists of qualified IP
@@ -25,8 +26,9 @@ type NamedAddressSet struct {
 // names are discovered, resolved into the corresponding IP addresses, and
 // finally (in)validated.
 type NamedAddressesMap struct {
-	m  map[string][]types.QualifiedAddressValue
-	mu sync.Mutex
+	m    map[string][]types.QualifiedAddressValue
+	errs map[string]string // FQDN -> resolution error
+	mu   sync.Mutex
 }
 
 // Get returns (a copy of) all named addresses from the map.
@@ -38,6 +40,7 @@ func (m *NamedAddressesMap) Get() []NamedAddressSet {
 		sets = append(sets, NamedAddressSet{
 			FQDN:      name,
 			Addresses: slices.Clone(addrs),
+			Error:     m.errs[name],
 		})
 	}
 	return sets
@@ -47,7 +50,8 @@ func (m *NamedAddressesMap) Get() []NamedAddressSet {
 // NamedAddressesMap.
 func NewNamedAddressesMap() *NamedAddressesMap {
 	return &NamedAddressesMap{
-		m: map[string][]types.QualifiedAddressValue{},
+		m:    map[string][]types.QualifiedAddressValue{},
+		errs: map[string]string{},
 	}
 }
 
@@ -56,6 +60,9 @@ func NewNamedAddressesMap() *NamedAddressesMap {
 // follows:
 //   - from unverified to verifying
 //   - from verifying to either verified or invalid
+//
+// A NamedAddress without an address but with an error records that its name
+// couldn't be resolved.
 func (m *NamedAddressesMap) Update(namaddr types.NamedAddress) {
 	if namaddr == nil {
 		return
@@ -66,28 +73,26 @@ func (m *NamedAddressesMap) Update(namaddr types.NamedAddress) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if qualaddr, ok := m.m[fqdn]; ok {
-		addr := namaddr.Addr()
-		if addr == "" {
-			return
-		}
-		for idx := range qualaddr {
-			if qualaddr[idx].Address == addr {
-				if namaddr.Qual() > qualaddr[idx].Quality { // slightly simplified "update" rule
-					qualaddr[idx].Quality = namaddr.Qual()
-				}
-				return
-			}
-		}
-		m.m[fqdn] = append(qualaddr, namaddr.QA())
-		return
-	}
+	qualaddr, ok := m.m[fqdn]
 	addr := namaddr.Addr()
 	if addr == "" {
-		m.m[fqdn] = []types.QualifiedAddressValue{}
-	} else {
-		m.m[fqdn] = []types.QualifiedAddressValue{namaddr.QA()}
+		if !ok {
+			m.m[fqdn] = []types.QualifiedAddressValue{}
+		}
+		if err := namaddr.Err(); err != nil {
+			m.errs[fqdn] = err.Error()
+		}
+		return
 	}
+	for idx := range qualaddr {
+		if qualaddr[idx].Address == addr {
+			if namaddr.Qual() > qualaddr[idx].Quality { // slightly simplified "update" rule
+				qualaddr[idx].Quality = namaddr.Qual()
+			}
+			return
+		}
+	}
+	m.m[fqdn] = append(qualaddr, namaddr.QA())
 }
 
 // Track NamedAddress updates received from the specified update channel until

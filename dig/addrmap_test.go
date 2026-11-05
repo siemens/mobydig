@@ -6,11 +6,13 @@ package dig
 
 import (
 	"context"
+	"errors"
 
 	"github.com/siemens/mobydig/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/thediveo/success"
 )
 
 var _ = Describe("named addresses map", func() {
@@ -26,6 +28,18 @@ var _ = Describe("named addresses map", func() {
 		Expect(namaddrs[0].Addresses).To(HaveLen(1))
 		namaddrs[0].Addresses[0].Quality = types.Verified
 		Expect(m.Get()[0].Addresses[0].Quality).To(Equal(types.Unverified))
+	})
+
+	It("records unresolvable names", func() {
+		m := NewNamedAddressesMap()
+		m.Update(&types.NamedAddressValue{FQDN: "foo."})
+		m.Update(AssignableTo[types.NamedAddress](
+			(&types.NamedAddressValue{FQDN: "foo."}).WithNewQuality(types.Invalid, errors.New("no answers"))))
+		Expect(m.Get()).To(ConsistOf(SatisfyAll(
+			HaveField("FQDN", "foo."),
+			HaveField("Addresses", BeEmpty()),
+			HaveField("Error", "no answers"),
+		)))
 	})
 
 	It("ignores incomplete and stale updates", func() {

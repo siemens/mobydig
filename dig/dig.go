@@ -63,13 +63,14 @@ func (d *Digger) DigNetworks(ctx context.Context, nets []DockerNetwork) {
 
 // DigFQDNs digs the given list of “host names” (whatever “host names” actually
 // might mean). Intermediate and final results are getting sent to the channel
-// returned beforehand by New.
+// returned beforehand by New. Names that cannot be resolved are reported
+// without an address, but with Invalid quality and the resolution error.
 func (d *Digger) DigFQDNs(ctx context.Context, names []string) {
 	// Initially sent all unverified FQDNs to get the ball rolling so that the
 	// consumer knows which FQDNs are going to be dug up next. Also submit the
 	// DNS worker jobs to resolve the FQDNs...
 	for _, name := range names {
-		name := dns.Fqdn(name) // TODO: search list???
+		name := dns.Fqdn(name)
 		// Initially inform the consumer of any FQDN that will undergo
 		// resolution later; please note that ResolveName will enqueue
 		// resolutions and thus not block. We only block if the consumer doesn't
@@ -82,6 +83,14 @@ func (d *Digger) DigFQDNs(ctx context.Context, names []string) {
 			return
 		}
 		d.workers.ResolveName(ctx, name, func(addrs []string, err error) {
+			if len(addrs) == 0 && err != nil && ctx.Err() == nil {
+				select {
+				case d.news <- (&types.NamedAddressValue{FQDN: name}).
+					WithNewQuality(types.Invalid, err).(types.NamedAddress):
+				case <-ctx.Done():
+				}
+				return
+			}
 			for _, addr := range addrs {
 				// Avoid blocking endlessly in case of the context getting
 				// cancelled.
