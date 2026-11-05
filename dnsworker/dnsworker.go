@@ -19,7 +19,7 @@ import (
 // DnsPool is a (size-limited) pool of DNS client connections talking with the
 // same DNS resolver address.
 type DnsPool struct {
-	netns   relations.Relation // network namespace to ping from, or nil.
+	netns   relations.Relation // network namespace to resolve names in, or nil.
 	dnsclnt *dns.Client
 	addr    string
 	workers *workerpool.WorkerPool
@@ -124,17 +124,39 @@ func (p *DnsPool) redial() (*dns.Conn, error) {
 	return res.conn, res.err
 }
 
+// reconnect replaces the network connection of conn with a newly dialed one,
+// leaving conn untouched if dialing fails.
+func (p *DnsPool) reconnect(conn *dns.Conn) error {
+	newconn, err := p.redial()
+	if err != nil {
+		return err
+	}
+	_ = conn.Close()
+	conn.Conn = newconn.Conn
+	return nil
+}
+
+// exchange sends msg on conn and returns the reply. As the DNS server might
+// have closed an idle connection, exchange reconnects and retries once on
+// failure. It never leaves a failed connection behind, as a late reply might
+// still arrive on it.
+func (p *DnsPool) exchange(ctx context.Context, msg *dns.Msg, conn *dns.Conn) (*dns.Msg, error) {
+	r, _, err := p.dnsclnt.ExchangeWithConnContext(ctx, msg, conn)
+	if err == nil {
+		return r, nil
+	}
+	if ctx.Err() == nil && p.reconnect(conn) == nil {
+		if r, _, err = p.dnsclnt.ExchangeWithConnContext(ctx, msg, conn); err == nil {
+			return r, nil
+		}
+	}
+	_ = p.reconnect(conn)
+	return nil, err
+}
+
 // Submit a task to the DNS client connection pool, where it gets enqueued to be
 // executed on an available DNS client connection.
 func (p *DnsPool) Submit(task func(conn *dns.Conn)) {
-	p.submit(func(conn *dns.Conn) bool {
-		task(conn)
-		return false
-	})
-}
-
-// submit enqueues a task that reports whether its connection is broken.
-func (p *DnsPool) submit(task func(conn *dns.Conn) (broken bool)) {
 	p.workers.Submit(func() { p.task(task) })
 }
 
@@ -149,12 +171,14 @@ func (p *DnsPool) submit(task func(conn *dns.Conn) (broken bool)) {
 // Please note that when the passed context is cancelled this will cancel all
 // in-flight as well as scheduled name resolution jobs.
 func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string, error)) {
-	p.submit(func(conn *dns.Conn) (broken bool) {
+	p.Submit(func(conn *dns.Conn) {
 		var addrs []string
 		var err error
 		defer func() { fn(addrs, err) }() // ...ensure triggering the result callback on our way out
 
-		name := dns.Fqdn(name) // TODO: search list???
+		// Docker's embedded DNS resolves container and service names as single
+		// labels, so there is no need for a search list.
+		name := dns.Fqdn(name)
 		nadanothing := true
 		for _, addrType := range []uint16{dns.TypeA, dns.TypeAAAA} {
 			// don't try to resolve the name if the context has been cancelled;
@@ -162,7 +186,7 @@ func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string
 			select {
 			case <-ctx.Done():
 				err = ctx.Err()
-				return false
+				return
 			default:
 			}
 
@@ -171,15 +195,14 @@ func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string
 			}
 			msg.SetQuestion(name, addrType)
 			var r *dns.Msg
-			r, _, err = p.dnsclnt.ExchangeWithConnContext(ctx, &msg, conn)
+			r, err = p.exchange(ctx, &msg, conn)
 			if err != nil {
-				// a late reply might still arrive on this connection.
-				return true
+				return
 			}
 			if r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError {
 				err = fmt.Errorf("ResolveName: query for %q failed with %s",
 					name, dns.RcodeToString[r.Rcode])
-				return false
+				return
 			}
 			for _, rr := range r.Answer {
 				switch addrRR := rr.(type) {
@@ -198,15 +221,12 @@ func (p *DnsPool) ResolveName(ctx context.Context, name string, fn func([]string
 		if nadanothing {
 			err = fmt.Errorf("ResolveName: query for %q yields no answers", name)
 		}
-		return false
 	})
 }
 
 // task grabs the next free DNS client and passes it to the specified function.
-// After the function returns, the connection is put back into the free list,
-// or replaced by a newly dialed connection in case the task reports it as
-// broken.
-func (p *DnsPool) task(task func(conn *dns.Conn) (broken bool)) {
+// After the function returns, the connection is put back into the free list.
+func (p *DnsPool) task(task func(conn *dns.Conn)) {
 	// pop off a free DNS client connection,
 	// https://ueokande.github.io/go-slice-tricks/,
 	p.mu.Lock()
@@ -217,14 +237,7 @@ func (p *DnsPool) task(task func(conn *dns.Conn) (broken bool)) {
 	conn := p.free[last]
 	p.free = p.free[:last]
 	p.mu.Unlock()
-	if task(conn) {
-		_ = conn.Close()
-		// On redial failure keep the closed connection: the next task then fails
-		// fast and tries redialing again.
-		if newconn, err := p.redial(); err == nil {
-			conn = newconn
-		}
-	}
+	task(conn)
 	p.mu.Lock()
 	p.free = append(p.free, conn)
 	p.mu.Unlock()

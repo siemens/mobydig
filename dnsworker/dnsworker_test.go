@@ -6,6 +6,7 @@ package dnsworker
 
 import (
 	"context"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -51,15 +52,16 @@ var _ = Describe("DNS client connection pool", func() {
 
 	It("replaces broken connections", func(ctx context.Context) {
 		pool := Successful(New(ctx, 1, &dns.Client{}, "127.0.0.1:53"))
-		var broken, next *dns.Conn
-		pool.submit(func(conn *dns.Conn) bool {
-			broken = conn
-			return true
+		var broken, renewed net.Conn
+		var err error
+		pool.Submit(func(conn *dns.Conn) {
+			broken = conn.Conn
+			err = pool.reconnect(conn)
+			renewed = conn.Conn
 		})
-		pool.Submit(func(conn *dns.Conn) { next = conn })
 		pool.StopWait()
-		Expect(next).NotTo(BeNil())
-		Expect(next).NotTo(BeIdenticalTo(broken))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(renewed).NotTo(BeIdenticalTo(broken))
 	})
 
 	It("runs a goroutine-limited set of DNS tasks", NodeTimeout(30*time.Second), func(ctx context.Context) {
