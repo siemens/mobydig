@@ -6,14 +6,17 @@ package messymoby
 
 import (
 	"context"
+	"errors"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 )
 
 // RemoveDuplicateTestNetworks removes all networks carrying the specified label
 // whose names are used by multiple networks with different IDs. An empty label
-// name removes nothing.
+// name removes nothing. Networks that vanished in the meantime aren't reported
+// as errors.
 func RemoveDuplicateTestNetworks(ctx context.Context, cln *client.Client, labelname string) error {
 	nets, err := cln.NetworkList(ctx, client.NetworkListOptions{})
 	if err != nil {
@@ -28,6 +31,7 @@ func RemoveDuplicateTestNetworks(ctx context.Context, cln *client.Client, labeln
 		netrscs[net.ID] = &nets.Items[idx].Network
 	}
 	// Now remove all networks with duplicate IDs.
+	var errs []error
 	for netname, netIDs := range netnames {
 		if len(netIDs) == 1 {
 			continue
@@ -37,11 +41,13 @@ func RemoveDuplicateTestNetworks(ctx context.Context, cln *client.Client, labeln
 			continue
 		}
 		for _, netID := range netIDs {
-			if _, ok := netrscs[netID].Labels[labelname]; ok && labelname != "" {
-				_, _ = cln.NetworkRemove(ctx, netID, client.NetworkRemoveOptions{})
+			if _, ok := netrscs[netID].Labels[labelname]; !ok || labelname == "" {
+				continue
+			}
+			if _, err := cln.NetworkRemove(ctx, netID, client.NetworkRemoveOptions{}); err != nil && !cerrdefs.IsNotFound(err) {
+				errs = append(errs, err)
 			}
 		}
 	}
-
-	return nil
+	return errors.Join(errs...)
 }
