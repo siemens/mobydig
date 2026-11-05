@@ -50,8 +50,9 @@
     "postCreateCommand": {
         "go-for-root": "echo 'Defaults:vscode secure_path = \"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin\"' | sudo tee -a /etc/sudoers.d/vscode",
         "no-first-run-notice": "rm -f /workspaces/.codespaces/shared/first-run-notice.txt",
-        "unconfine-apparmor": "echo 0 | sudo tee -a /proc/sys/kernel/apparmor_restrict_unprivileged_userns",
-        "userns-for-all": "echo 1 | sudo tee -a /proc/sys/kernel/unprivileged_userns_clone"
+        // these sysctls only exist on Ubuntu/Debian kernels, but not on, say, WSL2.
+        "unconfine-apparmor": "[ ! -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ] || echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns",
+        "userns-for-all": "[ ! -e /proc/sys/kernel/unprivileged_userns_clone ] || echo 1 | sudo tee /proc/sys/kernel/unprivileged_userns_clone"
     },
     "customizations": {
         "vscode": {
