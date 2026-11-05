@@ -20,14 +20,12 @@ import (
 // container or network elements.
 const MessyMobyLabel = "messymoby"
 
-// NewClient returns a new Docker client connected to the default socket API
-// location on the local host.
+// NewClient returns a new Docker client connected to the Docker daemon
+// specified by the environment, defaulting to the local host's socket API.
 func NewClient() *client.Client {
 	gi.GinkgoHelper()
 
-	return s.Successful(client.New(
-		client.WithHost("unix:///var/run/docker.sock"),
-	))
+	return s.Successful(client.New(client.FromEnv))
 }
 
 // DockerCompose executes docker-compose with the specified CLI arguments,

@@ -11,9 +11,9 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// RemoveDuplicateTestNetworks removes duplicate networks, that is multiple
-// networks with the same name, yet different IDs. Optionally, removal can be
-// limited to networks with a specific label name only.
+// RemoveDuplicateTestNetworks removes all networks carrying the specified label
+// whose names are used by multiple networks with different IDs. An empty label
+// name removes nothing.
 func RemoveDuplicateTestNetworks(ctx context.Context, cln *client.Client, labelname string) error {
 	nets, err := cln.NetworkList(ctx, client.NetworkListOptions{})
 	if err != nil {

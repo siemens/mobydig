@@ -10,8 +10,8 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// RemoveDeadTestContainers removes dead or stopped containers. Optionally,
-// removal can be limited to networks with a specific label name only.
+// RemoveDeadTestContainers removes exited or created containers carrying the
+// specified label. An empty label name removes nothing.
 func RemoveDeadTestContainers(ctx context.Context, cln *client.Client, labelname string) error {
 	exited, err := cln.ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("status", "exited"),
