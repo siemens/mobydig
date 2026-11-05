@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"time"
 
@@ -32,14 +33,29 @@ var _ = Describe("digging and reporting", func() {
 		})
 	})
 
-	It("reports an unknown container", NodeTimeout(30*time.Second), func(ctx context.Context) {
-		var out safe.Buffer
+	It("reports an unknown container without usage", NodeTimeout(30*time.Second), func(ctx context.Context) {
+		var out, errout safe.Buffer
 		cmd := newRootCmd()
 		cmd.SetArgs([]string{"test-nonexisting-1"})
 		cmd.SetOut(&out)
-		cmd.SetErr(GinkgoWriter)
+		cmd.SetErr(&errout)
 		Expect(cmd.ExecuteContext(ctx)).To(MatchError(ContainSubstring("cannot discover attached networks")))
 		Expect(out.String()).To(ContainSubstring("inspecting container test-nonexisting-1"))
+		Expect(errout.String()).To(SatisfyAll(
+			ContainSubstring("Error: cannot discover"),
+			Not(ContainSubstring("Usage:"))))
+	})
+
+	It("logs debug output to stderr", NodeTimeout(30*time.Second), func(ctx context.Context) {
+		DeferCleanup(slog.SetDefault, slog.Default())
+		var out, errout safe.Buffer
+		cmd := newRootCmd()
+		cmd.SetArgs([]string{"--debug", "test-nonexisting-1"})
+		cmd.SetOut(&out)
+		cmd.SetErr(&errout)
+		Expect(cmd.ExecuteContext(ctx)).To(HaveOccurred())
+		Expect(errout.String()).To(ContainSubstring("debug logging enabled"))
+		Expect(out.String()).NotTo(ContainSubstring("debug logging enabled"))
 	})
 
 	It("digs and verifies the names around a container", NodeTimeout(60*time.Second), func(ctx context.Context) {

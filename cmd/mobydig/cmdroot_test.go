@@ -5,6 +5,8 @@
 package main
 
 import (
+	"bytes"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -25,5 +27,14 @@ var _ = Describe("mobydig command", func() {
 		Entry("too many workers", []string{"--workers=11", "foo"}, "--workers"),
 		Entry("too fast spinner", []string{"--spinner=1ms", "foo"}, "--spinner"),
 	)
+
+	It("reports its version", func() {
+		var out bytes.Buffer
+		cmd := newRootCmd()
+		cmd.SetArgs([]string{"--version"})
+		cmd.SetOut(&out)
+		Expect(cmd.Execute()).To(Succeed())
+		Expect(out.String()).To(HavePrefix("mobydig version " + version()))
+	})
 
 })
