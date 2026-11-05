@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -44,7 +46,9 @@ func newRootCmd() (rootCmd *cobra.Command) {
 				slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})))
 				slog.Debug("debug logging enabled")
 			}
-			return DigAndReport(context.Background(), args[0])
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
+			return DigAndReport(ctx, args[0])
 		},
 	}
 	// Sets up the flags.

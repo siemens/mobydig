@@ -5,10 +5,10 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"net"
+	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -65,14 +65,14 @@ func (r *renderer) Render(na []dig.NamedAddressSet) {
 	}
 	// Render list of attached networks...
 	_, _ = fmt.Fprintf(r.w, "networks attached to container %s: ", r.centerName)
-	for idx, group := range groups {
-		if idx == 0 {
-			continue // skip unnamed group
+	sep := ""
+	for _, group := range groups {
+		gn := groupName(group[0].FQDN)
+		if gn == "" {
+			continue
 		}
-		if idx >= 2 {
-			_, _ = fmt.Fprint(r.w, " ")
-		}
-		_, _ = fmt.Fprint(r.w, networkNameStyle.Styled(groupName(group[0].FQDN)))
+		_, _ = fmt.Fprint(r.w, sep, networkNameStyle.Styled(gn))
+		sep = " "
 	}
 	_, _ = fmt.Fprintln(r.w)
 	// Render the network groups...
@@ -112,13 +112,13 @@ func (r *renderer) renderGroupDetails(labelwidth int, na dig.NamedAddressSet) {
 }
 
 // sortQualifiedAddresses sorts a slice of qualified address in place.
-// - IPv4 first, IPv6 ... (embarrassed slience) ... second.
+// - IPv4 first, IPv6 ... (embarrassed silence) ... second.
 // - sorts by address value.
 func sortQualifiedAddresses(addrs []types.QualifiedAddressValue) {
-	sort.Slice(addrs, func(a, b int) bool {
-		ipA := net.ParseIP(addrs[a].Address)
-		ipB := net.ParseIP(addrs[b].Address)
-		return bytes.Compare(ipA, ipB) < 0
+	slices.SortFunc(addrs, func(a, b types.QualifiedAddressValue) int {
+		ipA, _ := netip.ParseAddr(a.Address)
+		ipB, _ := netip.ParseAddr(b.Address)
+		return ipA.Compare(ipB)
 	})
 }
 

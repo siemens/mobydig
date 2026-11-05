@@ -23,12 +23,11 @@ import (
 // perspective of the center container. Finally, the addresses are verified by
 // pinging them for good or bad.
 func DigAndReport(ctx context.Context, startpointName string) error {
-	cln, err := client.New(
-		client.WithHost("unix:///var/run/docker.sock"),
-	)
+	cln, err := client.New(client.FromEnv)
 	if err != nil {
 		return fmt.Errorf("cannot connect to the Docker daemon: %w", err)
 	}
+	defer func() { _ = cln.Close() }()
 
 	// Create an empty (concurrency-safe) result map with named-and-qualified
 	// addresses and immediately fire off the rendering goroutine. The rendering
@@ -64,9 +63,14 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 			}
 		}
 	}()
+	stopRendering := func() {
+		close(trackingDone)
+		<-renderingDone
+	}
 
 	attachedNets, netnsref, err := mobynet.DiscoverAttachedNames(ctx, cln, startpointName)
 	if err != nil {
+		stopRendering()
 		return fmt.Errorf("cannot discover attached networks and their containers: %w", err)
 	}
 
@@ -80,12 +84,14 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 	// Rendering is done on the information collected by the NamedAddressMap.
 	digger, diggernews, err := dig.New(int(*workerNumber), netnsref)
 	if err != nil {
+		stopRendering()
 		return fmt.Errorf("cannot dig address information: %w", err)
 	}
-	verifier, news := verifier.New(int(*workerNumber), netnsref)
-	go verifier.Verify(ctx, diggernews)
+	vf, news := verifier.New(int(*workerNumber), netnsref)
+	go vf.Verify(ctx, diggernews)
+	var trackErr error
 	go func() {
-		_ = namaddrs.Track(ctx, news)
+		trackErr = namaddrs.Track(ctx, news)
 		close(trackingDone)
 	}()
 
@@ -94,12 +100,12 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 	// stages. Then close the input stream and wait for all the data to pass the
 	// stages and finally get rendered a last time.
 	go func() {
-		digger.DigNetworks(context.Background(), attachedNets)
+		digger.DigNetworks(ctx, attachedNets)
 		digger.StopWait()
 	}()
 	<-renderingDone
 
-	return nil
+	return trackErr
 }
 
 // renderData get the current named+verified address data and then renders (and
