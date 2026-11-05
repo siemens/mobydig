@@ -74,6 +74,8 @@ Never add test code to explicitly remove or kill stale containers, as container 
 
 For temporary directories in Ginkgo specs, do not use `GinkgoT().TempDir()`; instead use the plain stdlib together with `DeferCleanup`, for example `tmpdir := Successful(os.MkdirTemp("", "mobydav-test-"))` followed by `DeferCleanup(os.RemoveAll, tmpdir)`.
 
+When a test buffer might get written concurrently while expectations are checked (such as output rendered by background goroutines), use `safe.Buffer` from `github.com/thediveo/safe` instead of `bytes.Buffer`.
+
 ## End-to-End Tests
 
 End-to-end tests live in the `e2e/` package only and are opt-in: its suite skips itself unless the Ginkgo label filter explicitly selects the `e2e` label. Do not use build tags to gate them. `RunSpecs` already applies the `e2e` label suite-wide; use further labels (such as `k8s` or `tshark`) on specs to allow narrower selections.
