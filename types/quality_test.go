@@ -21,4 +21,15 @@ var _ = Describe("address quality", func() {
 		Entry("verified", Verified, false),
 	)
 
+	DescribeTable("textual representation",
+		func(q Quality, text string) {
+			Expect(q.String()).To(Equal(text))
+		},
+		Entry(nil, Unverified, "unverified"),
+		Entry(nil, Verifying, "verifying"),
+		Entry(nil, Invalid, "invalid"),
+		Entry(nil, Verified, "verified"),
+		Entry(nil, Quality(42), "Quality(42)"),
+	)
+
 })

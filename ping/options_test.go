@@ -40,4 +40,10 @@ var _ = Describe("pinger options", func() {
 		Expect(p.netns).To(BeNil())
 	})
 
+	It("pings unprivileged", func() {
+		p, _ := newPinger(1, 0, AsUnprivileged())
+		DeferCleanup(p.StopWait)
+		Expect(p.unprivileged).To(BeTrue())
+	})
+
 })

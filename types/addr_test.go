@@ -39,4 +39,16 @@ var _ = Describe("qualified addresses", func() {
 		Expect(na.Err()).To(Succeed())
 	})
 
+	It("gives access to named address details", func() {
+		na := &NamedAddressValue{
+			FQDN:                  "foo.",
+			QualifiedAddressValue: QualifiedAddressValue{Address: "10.0.0.1", Quality: Verified},
+		}
+		Expect(na.Name()).To(Equal("foo."))
+		Expect(na.Addr()).To(Equal("10.0.0.1"))
+		Expect(na.Qual()).To(Equal(Verified))
+		Expect(na.QA()).To(Equal(QualifiedAddressValue{Address: "10.0.0.1", Quality: Verified}))
+		Expect(na.NA()).To(Equal(*na))
+	})
+
 })
