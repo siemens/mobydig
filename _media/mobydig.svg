@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>pandoras-box-2</title>
+  <title>pandoras.box</title>
   <defs>
     <clipPath id="circle">
       <circle cx="256" cy="256" r="250"/>
@@ -84,9 +84,9 @@
       <g transform="translate(244 358)">
         <rect x="-86" y="-44" width="172" height="88" rx="12" fill="#0D2242" stroke="#FFFFFF" stroke-width="3"/>
         <text x="0" y="-19" text-anchor="middle" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="22" fill="#FFFFFF" letter-spacing="1">HELLO</text>
-        <text x="0" y="-5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="11" fill="#FFFFFF">my name is</text>
+        <text x="0" y="-5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="11" fill="#FFFFFF">my domain name is</text>
         <rect x="-77" y="1" width="154" height="34" rx="4" fill="#FFFFFF"/>
-        <text x="0" y="24" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', cursive" font-weight="700" font-size="19" fill="#1B2A49" textLength="142" lengthAdjust="spacingAndGlyphs">pandoras-box-2</text>
+        <text x="0" y="24" text-anchor="middle" font-family="'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', cursive" font-weight="700" font-size="19" fill="#1B2A49" textLength="130" lengthAdjust="spacingAndGlyphs">pandoras.box</text>
       </g>
     </g>
     </g>
