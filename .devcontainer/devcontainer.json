@@ -22,6 +22,8 @@
             "version": "latest",
             "moby": false // go for the upstream Docker-CE
         },
+        // Do not set "uncovered-packages": the resulting -coverpkg mode makes go1.27.3
+        // corrupt cmd/mobydig's coverage data when run as root ("bad pkgID: 0").
         "ghcr.io/thediveo/devcontainer-features/gocover:1": {
             "root": true,           // test both as ordinary user and root
             "num-programs": "1",    // do never run package-level tests in parallel
