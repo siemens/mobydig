@@ -5,7 +5,6 @@ go 1.26.6
 require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/gammazero/workerpool v1.3.0
-	github.com/gosuri/uilive v0.0.4
 	github.com/miekg/dns v1.1.73
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
@@ -18,8 +17,10 @@ require (
 	github.com/thediveo/lxkns v0.48.0
 	github.com/thediveo/namspill v0.1.9
 	github.com/thediveo/nonstd v0.22.0
+	github.com/thediveo/safe v0.9.1
 	github.com/thediveo/success v1.4.0
 	github.com/thediveo/whalewatcher/v2 v2.1.1
+	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -86,7 +87,6 @@ require (
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect

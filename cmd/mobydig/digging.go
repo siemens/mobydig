@@ -7,12 +7,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
-	"github.com/gosuri/uilive"
 	"github.com/moby/moby/client"
 
 	"github.com/siemens/mobydig/dig"
+	"github.com/siemens/mobydig/internal/livewriter"
 	"github.com/siemens/mobydig/mobynet"
 	"github.com/siemens/mobydig/verifier"
 )
@@ -21,8 +22,8 @@ import (
 // for networks attached to it. Next, container and service names on these
 // networks are discovered, and then these (DNS) names dug up from the
 // perspective of the center container. Finally, the addresses are verified by
-// pinging them for good or bad.
-func DigAndReport(ctx context.Context, startpointName string) error {
+// pinging them for good or bad. The progress gets continuously rendered to out.
+func DigAndReport(ctx context.Context, out io.Writer, startpointName string) error {
 	cln, err := client.New(client.FromEnv)
 	if err != nil {
 		return fmt.Errorf("cannot connect to the Docker daemon: %w", err)
@@ -39,12 +40,7 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 	renderingDone := make(chan struct{})
 
 	go func() {
-		// Dunno what uilive's background updating mode using Start() is good
-		// for? It may trigger anytime with the rendering into the buffer not
-		// yet complete, thus making the terminal output very flickery. So we
-		// avoid Start() and instead trigger an explicit flush to the terminal
-		// after having completed the rendering.
-		term := uilive.New()
+		term := livewriter.New(out)
 		renderer := newRenderer(term, startpointName)
 		renderer.Indentation = int(*indentation)
 		defer func() {
@@ -110,7 +106,7 @@ func DigAndReport(ctx context.Context, startpointName string) error {
 
 // renderData get the current named+verified address data and then renders (and
 // flushes) it to the terminal.
-func renderData(term *uilive.Writer, r *renderer, data *dig.NamedAddressesMap) {
+func renderData(term *livewriter.Writer, r *renderer, data *dig.NamedAddressesMap) {
 	r.Render(data.Get())
 	_ = term.Flush()
 }

@@ -86,8 +86,6 @@ github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 h1:El6M4kTTCOh6aBiKaU
 github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510/go.mod h1:pupxD2MaaD3pAXIBCelhxNneeOaAeabZDe5s4K6zSpQ=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/gosuri/uilive v0.0.4 h1:hUEBpQDj8D8jXgtCdBu7sWsy5sbW/5GhuO8KBwJ2jyY=
-github.com/gosuri/uilive v0.0.4/go.mod h1:V/epo5LjjlDE5RJUcqx8dbw+zc93y5Ya3yg8tfZ74VI=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePCEX9iuS+cneUwncnw=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
 github.com/in-toto/attestation v1.2.0 h1:aPRUZ3azbqD7yEBD5fP3TD8Dszf+YHo284SOcpahjQk=
@@ -208,6 +206,8 @@ github.com/thediveo/notwork v1.14.0 h1:s7xDPrJGft//9AATuSO3uS8fHmPRpspxm6+uLHCVB
 github.com/thediveo/notwork v1.14.0/go.mod h1:MaEQIYWJoGRS1gzlOr1NM+hyU+/Q0Fq+Gj/gQQpvJfg=
 github.com/thediveo/procfsroot v1.1.0 h1:Hm5r+eqgEiv+tihqyY/O/Ugsw0uii85UAcxQXos/AsY=
 github.com/thediveo/procfsroot v1.1.0/go.mod h1:eTIV6+uOg+7Idaz3ewusMveF5xuGe5JHIvDbX2TeJR0=
+github.com/thediveo/safe v0.9.1 h1:qkJMH2rFAC+JkpYSZRzrkOkW+J+4vquOD6iVEn7iFVU=
+github.com/thediveo/safe v0.9.1/go.mod h1:1E2DtH939PSWXk+ztMcSsgDtpYfGaYgmMqHSKQ3WxrU=
 github.com/thediveo/spacetest v0.15.1 h1:obcPTaFNw38m2w32ihyhNLVanllP4zI7IL867sQB8jg=
 github.com/thediveo/spacetest v0.15.1/go.mod h1:m4cJ8eSyckaLq4RAMvNyOfD5Tgozg/M57Ca7f3SiZPU=
 github.com/thediveo/success v1.4.0 h1:EDaiehuh8s+KBqPJm0JesBIUsDfu3aBiB4jsqoc2Nr4=

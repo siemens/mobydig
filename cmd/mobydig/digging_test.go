@@ -5,14 +5,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"os"
 	"time"
 
-	"github.com/gosuri/uilive"
-	"github.com/thediveo/fdooze/filedesc"
+	"github.com/thediveo/safe"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -23,34 +20,23 @@ import (
 
 var _ = Describe("digging and reporting", func() {
 
-	var out *bytes.Buffer
-
 	BeforeEach(func() {
 		goodgos := Goroutines()
 		goodfds := Filedescriptors()
 		DeferCleanup(func() {
 			Eventually(Goroutines).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
 				ShouldNot(HaveLeaked(goodgos))
-			// uilive opens /dev/tty on each flush, leaving it to the GC to close.
 			Eventually(Filedescriptors).WithTimeout(3 * time.Second).WithPolling(250 * time.Millisecond).
-				ShouldNot(HaveLeakedFds(goodfds, WithTransform(func(fd FileDescriptor) string {
-					if pathfd, ok := fd.(*filedesc.PathFd); ok {
-						return pathfd.Path()
-					}
-					return ""
-				}, Equal("/dev/tty"))))
+				ShouldNot(HaveLeakedFds(goodfds))
 			Expect(Tasks()).To(BeUniformlyNamespaced())
 		})
-
-		out = &bytes.Buffer{}
-		DeferCleanup(func(orig io.Writer) { uilive.Out = orig }, uilive.Out)
-		uilive.Out = out
 	})
 
 	It("reports an unknown container", NodeTimeout(30*time.Second), func(ctx context.Context) {
+		var out safe.Buffer
 		cmd := newRootCmd()
 		cmd.SetArgs([]string{"test-nonexisting-1"})
-		cmd.SetOut(GinkgoWriter)
+		cmd.SetOut(&out)
 		cmd.SetErr(GinkgoWriter)
 		Expect(cmd.ExecuteContext(ctx)).To(MatchError(ContainSubstring("cannot discover attached networks")))
 		Expect(out.String()).To(ContainSubstring("inspecting container test-nonexisting-1"))
@@ -60,8 +46,10 @@ var _ = Describe("digging and reporting", func() {
 		if os.Getuid() != 0 {
 			Skip("needs root")
 		}
+		var out safe.Buffer
 		cmd := newRootCmd()
 		cmd.SetArgs([]string{"test-test-1"})
+		cmd.SetOut(&out)
 		Expect(cmd.ExecuteContext(ctx)).To(Succeed())
 		Expect(out.String()).To(SatisfyAll(
 			ContainSubstring("networks attached to container test-test-1"),

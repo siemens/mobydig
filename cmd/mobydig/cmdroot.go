@@ -48,7 +48,7 @@ func newRootCmd() (rootCmd *cobra.Command) {
 			}
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
-			return DigAndReport(ctx, args[0])
+			return DigAndReport(ctx, cmd.OutOrStdout(), args[0])
 		},
 	}
 	// Sets up the flags.
